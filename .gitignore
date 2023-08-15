@@ -1,0 +1,13 @@
+# my IDE
+.vscode
+
+# working files and directories
+sysroot
+*.o
+*.d
+
+# output files
+asternix.iso
+kernel/asternix.bin
+libc/libc.so
+libc/libk.a
