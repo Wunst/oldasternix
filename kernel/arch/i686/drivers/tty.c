@@ -17,6 +17,15 @@ static uint8_t format = 0x07;
 static uint16_t *vga_buffer;
 static size_t pos = 0;
 
+static void tty_scroll(int lines)
+{
+    int points = lines * VGA_WIDTH;
+    int bytes = points * 2;
+    memmove(vga_buffer, &vga_buffer[points], VGA_BUFFER_SIZE * 2 - bytes);
+    memset(&vga_buffer[VGA_BUFFER_SIZE - points - 1], 0, bytes);
+    pos -= points;
+}
+
 void tty_init()
 {
     vga_buffer = mem_map_page(0xf0000000, 0xb8000, DEFAULT_PAGE_FLAGS);
@@ -34,11 +43,8 @@ void tty_putchar(char ch)
     }
     
     if (pos >= VGA_BUFFER_SIZE) {
-        /* Scroll down */
-        int amount = ((pos - VGA_BUFFER_SIZE) / VGA_WIDTH + 1) * VGA_WIDTH * 2;
-        memmove(vga_buffer, &vga_buffer[amount], VGA_BUFFER_SIZE - amount);
-        memset(&vga_buffer[VGA_BUFFER_SIZE - amount], 0, amount);
-        pos -= amount;
+        int lines = (pos - VGA_BUFFER_SIZE) / VGA_WIDTH + 1;
+        tty_scroll(lines);
     }
 }
 
