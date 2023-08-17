@@ -166,12 +166,12 @@ void *memcpy(void *dest, const void *src, size_t n)
 void *memmove(void *dest, const void *src, size_t n)
 {
     void *ret = dest;
-    if (dest > src) {
+    if (dest < src) {
         while (n--) {
             *(unsigned char *)(dest++) = *(unsigned char *)(src++);
         }
     }
-    if (dest < src) {
+    if (dest > src) {
         src += n;
         dest += n;
         while (n--) {
