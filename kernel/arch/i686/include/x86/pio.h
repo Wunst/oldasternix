@@ -21,21 +21,21 @@ static void outl(uint16_t port, uint32_t val)
 static uint8_t inb(uint16_t port)
 {
     uint8_t ret;
-    asm ("inb %%dx, %%al" : "=a"(ret) : "d"(port) : "memory");
+    asm volatile ("inb %%dx, %%al" : "=a"(ret) : "d"(port) : "memory");
     return ret;
 }
 
 static uint16_t inw(uint16_t port)
 {
     uint16_t ret;
-    asm ("inw %%dx, %%ax" : "=a"(ret) : "d"(port) : "memory");
+    asm volatile ("inw %%dx, %%ax" : "=a"(ret) : "d"(port) : "memory");
     return ret;
 }
 
 static uint32_t inl(uint16_t port)
 {
     uint32_t ret;
-    asm ("inl %%dx, %%eax" : "=a"(ret) : "d"(port) : "memory");
+    asm volatile ("inl %%dx, %%eax" : "=a"(ret) : "d"(port) : "memory");
     return ret;
 }
 
