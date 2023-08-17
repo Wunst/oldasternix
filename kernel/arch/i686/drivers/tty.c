@@ -1,5 +1,6 @@
 #include <drivers/tty.h>
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -17,6 +18,8 @@ static uint8_t format = 0x07;
 static uint16_t *vga_buffer;
 static size_t pos = 0;
 
+static bool processing_sequence;
+
 static void tty_scroll(int lines)
 {
     int points = lines * VGA_WIDTH;
@@ -33,11 +36,26 @@ void tty_init()
 
 void tty_putchar(char ch)
 {
-    if (ch == '\n') {
+    switch (ch) {
+    case '\n': /* Newline */
+    case '\r': /* Carriage Return (^M) */
         pos = (pos / VGA_WIDTH + 1) * VGA_WIDTH;
-    } else if (ch == '\t') {
+        break;
+
+    case '\t': /* Tab */
         pos = (pos / TAB_SIZE + 1) * TAB_SIZE;
-    } else {
+        break;
+    
+    case '\f': /* Form Feed (^L, Clear Screen) */
+        memset(vga_buffer, 0, VGA_BUFFER_SIZE * 2);
+        pos = 0;
+        break;
+    
+    case '\e': /* Escape (^[, Begin ANSI escape sequence) */
+        processing_sequence = true;
+        break;
+
+    default:
         vga_buffer[pos] = (uint16_t)format << 8 | ch;
         pos++;
     }
