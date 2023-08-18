@@ -34,15 +34,22 @@
 #define PS2_KB_GETCONFIG 0x20
 #define PS2_KB_SETCONFIG 0x60
 #define PS2_KB_DISABLE2 0xa7
+#define PS2_KB_CONTROLLER_SELF_TEST 0xaa
 #define PS2_KB_DISABLE1 0xad
 #define PS2_KB_ENABLE1 0xae
+
+/* Controller response */
+
+#define PS2_KB_CONTROLLER_SELF_TEST_PASSED 0x55
 
 /* Device commands (sent on the data port!) */
 
 #define PS2_KB_SETSCANCODESET 0xf0
+#define PS2_KB_RESET 0xff
 
 /* Device response */
 
+#define PS2_KB_SELF_TEST_PASSED 0xaa
 #define PS2_KB_ACK 0xfa
 #define PS2_KB_RESEND 0xfe
 
@@ -57,7 +64,7 @@ static void wait_out(uint16_t port, uint8_t val)
     outb(port, val);
 }
 
-static uint8_t wait_in(uint16_t port)
+static uint8_t wait_in()
 {
     uint8_t status;
     do {
@@ -66,10 +73,31 @@ static uint8_t wait_in(uint16_t port)
     return inb(PS2_KB_DATA);
 }
 
+static uint8_t send_dev_command1(uint8_t command)
+{
+    uint8_t status;
+    do {
+        wait_out(PS2_KB_DATA, command);
+        status = wait_in();
+    } while (status == PS2_KB_RESEND);
+    return status;
+}
+
+static uint8_t send_dev_command2(uint8_t command, uint8_t arg)
+{
+    uint8_t status;
+    do {
+        wait_out(PS2_KB_DATA, command);
+        wait_out(PS2_KB_DATA, arg);
+        status = wait_in();
+    } while (status == PS2_KB_RESEND);
+    return status;
+}
+
 static void cfg_set(uint8_t flag)
 {
     wait_out(PS2_KB_CMD, PS2_KB_GETCONFIG);
-    uint8_t config = wait_in(PS2_KB_DATA);
+    uint8_t config = wait_in();
     config |= flag;
     wait_out(PS2_KB_CMD, PS2_KB_SETCONFIG);
     wait_out(PS2_KB_DATA, config);
@@ -78,7 +106,7 @@ static void cfg_set(uint8_t flag)
 static void cfg_clear(uint8_t flag)
 {
     wait_out(PS2_KB_CMD, PS2_KB_GETCONFIG);
-    uint8_t config = wait_in(PS2_KB_DATA);
+    uint8_t config = wait_in();
     config &= ~flag;
     wait_out(PS2_KB_CMD, PS2_KB_SETCONFIG);
     wait_out(PS2_KB_DATA, config);
@@ -86,8 +114,14 @@ static void cfg_clear(uint8_t flag)
 
 static bool controller_setup()
 {
-    /* I disable device ports, I disable IRQ, what else do I have to do to NOT
-     * get RANDOM INTERRUPTS when sending data on real hardware asdsfgunig */
+    /* Self-test controller. */
+    wait_out(PS2_KB_CMD, PS2_KB_CONTROLLER_SELF_TEST);
+    if (wait_in() != PS2_KB_CONTROLLER_SELF_TEST_PASSED) {
+        printf("err: ps/2: controller self test failed\n");
+        return false;
+    }
+
+    /* Disable device port 2 (usually the mouse). */
     wait_out(PS2_KB_CMD, PS2_KB_DISABLE1);
     wait_out(PS2_KB_CMD, PS2_KB_DISABLE2);
 
@@ -96,25 +130,33 @@ static bool controller_setup()
      * compatibility reasons. */
     cfg_clear(PS2_KB_ENABLE_IRQ1 | PS2_KB_ENABLE_IRQ2 | PS2_KB_TRANSLATE);
 
+    /* Reset devices. */
+    uint8_t response = send_dev_command1(PS2_KB_RESET);
+    if (response != PS2_KB_ACK) {
+        printf("warn: ps/2: unable to reset devices\n");
+    } else if (wait_in() != PS2_KB_SELF_TEST_PASSED) {
+        printf("err: ps/2: device self test failed\n");
+        return false;
+    }
+
     /* If supported, we want to use set 3, the most modern one and the only one
      * with the reasonable stance of reporting both pressing and releasing on
      * every key, including the Pause key. */
-    do {
-        wait_out(PS2_KB_DATA, PS2_KB_SETSCANCODESET);
-        wait_out(PS2_KB_DATA, 3);
-    } while (wait_in(PS2_KB_DATA) == PS2_KB_RESEND);
+    response = send_dev_command2(PS2_KB_SETSCANCODESET, 3);
+    if (response != PS2_KB_ACK) {
+        printf("warn: ps/2: unable to set scancode set\n");
+    }
 
     /* Check if it worked. If it didn't, we just have to use whatever the
      * keyboard supports, which SHOULD always be 2, but might be 1? */
-    wait_out(PS2_KB_DATA, PS2_KB_SETSCANCODESET);
-    wait_out(PS2_KB_DATA, 0);
-    if (wait_in(PS2_KB_DATA) != PS2_KB_ACK) {
+    response = send_dev_command2(PS2_KB_SETSCANCODESET, 0);
+    if (response != PS2_KB_ACK) {
         printf("err: ps/2: failed to determine scancode set\n");
         return false;
     }
-    scancode_set = wait_in(PS2_KB_DATA);
-    if (scancode_set > 3) {
-        printf("err: ps/2: unknown scancode set: %d", scancode_set);
+    scancode_set = wait_in();
+    if (scancode_set < 1 || scancode_set > 3) {
+        printf("err: ps/2: unknown scancode set: %d\n", scancode_set);
         return false;
     }
     printf("info: ps/2: using scancode set %d\n", scancode_set);
