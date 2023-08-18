@@ -85,13 +85,10 @@ static uint8_t send_dev_command1(uint8_t command)
 
 static uint8_t send_dev_command2(uint8_t command, uint8_t arg)
 {
-    uint8_t status;
-    do {
-        wait_out(PS2_KB_DATA, command);
-        wait_out(PS2_KB_DATA, arg);
-        status = wait_in();
-    } while (status == PS2_KB_RESEND);
-    return status;
+    if (send_dev_command1(command) != PS2_KB_ACK) {
+        printf("err: ps/2: first byte not ACKed: %02X %02X\n", command, arg);
+    }
+    return send_dev_command1(arg);
 }
 
 static void cfg_set(uint8_t flag)
