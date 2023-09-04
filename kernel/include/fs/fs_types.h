@@ -18,6 +18,8 @@ enum i_perms {
     I_WOTH = 0200,
     I_ROTH = 0400,
     I_RWXO = 0700,
+
+    I_PERMS = 0777,
 };
 
 enum i_type {

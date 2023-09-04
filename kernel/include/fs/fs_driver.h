@@ -23,6 +23,7 @@ struct fs_driver {
 };
 
 struct fs_instance {
+    struct fs_driver *driver;
     struct inode *root;
 };
 
