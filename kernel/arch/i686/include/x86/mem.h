@@ -1,10 +1,3 @@
-/*
- * file: mem.h
- * description: Kernel memory management functionality. This is very
- *  architecture specific and its implementation is not portable at all at this
- *  point.
- */
-
 #ifndef MEM_H
 #define MEM_H
 
@@ -30,6 +23,8 @@ enum page_flags {
     PAGE_DIRECTORY_FLAGS = PG_PRES | PG_RW | PG_US,
 };
 
+void mem_set_bounds(uint32_t lower, uint32_t upper);
+void mem_set_used(uint32_t phys, uint32_t min_size);
 void mem_init(void);
 void *mem_map_page(uint32_t virt_min, uint32_t phys, enum page_flags flags);
 

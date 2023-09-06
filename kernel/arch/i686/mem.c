@@ -27,6 +27,8 @@
 /* defined in linker.ld */
 extern char __kernel_virtual_offset, __kernel_start, __kernel_end;
 
+static uint32_t lower_bnd = PROT_PHYS_START, upper_bnd = PROT_PHYS_END;
+
 /* By mapping the last PDE to the page directory itself, we can access all
  * paging structures (in the current address space) starting at 0xffc00000.
  * (see boot.s for further explanation) */
@@ -60,13 +62,28 @@ static uint32_t alloc_phys()
      * For now, we only use a single portion of memory (0x00100000-0x00efffff)
      * that is guaranteed to be free for use, which is going to waste a lot (in
      * fact, most) of physical memory space. */
-    for (ret = PROT_PHYS_START; ret < PROT_PHYS_END; ret += PAGE_SIZE) {
+    for (ret = lower_bnd; ret < upper_bnd; ret += PAGE_SIZE) {
         if (!is_phys_used(ret)) {
             set_phys_used(ret, true);
             return ret;
         }
     }
     return -1;
+}
+
+void mem_set_bounds(uint32_t lower, uint32_t upper)
+{
+    lower_bnd = lower;
+    upper_bnd = upper;
+}
+
+void mem_set_used(uint32_t phys, uint32_t min_size)
+{
+    uint32_t page = phys & ~4095;
+    do {
+        set_phys_used(page, true);
+        page += PAGE_SIZE;
+    } while (page < phys + min_size);
 }
 
 void mem_init()
