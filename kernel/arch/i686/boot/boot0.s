@@ -70,10 +70,20 @@ _start:
     movl $stack_top, %esp
     movl %esp, %ebp
 
-    /* Call into high level kernel. */
-    subl $0x08, %esp
+    /* Call into high level kernel.
+     * Calling convention is a bit weird: SYSTEM V ABI specifies the stack
+     * should be 16-byte aligned before using `call`, so we skip 12 bytes, then
+     * push our 4-byte argument. Then the C function expects us to push return
+     * address, but ljmp doesn't push any return address while lcall pushes an
+     * additional 4 bytes for return segment, breaking any argument passing
+     * entirely. So since we don't want to return anyways, we just skip another
+     * 4 bytes as a "pseudo-return address", then use a normal ljmp. */
+    subl $0x0c, %esp
     push %ebx
+    subl $0x04, %esp
     ljmp $k_code, $hlinit
+
+    /* unreachable */
 
     .section .text
     .global halt_loop
