@@ -30,8 +30,9 @@ extern char __kernel_virtual_offset, __kernel_start, __kernel_end;
 static uint32_t lower_bnd = PROT_PHYS_START, upper_bnd = PROT_PHYS_END;
 
 /* By mapping the last PDE to the page directory itself, we can access all
- * paging structures (in the current address space) starting at 0xffc00000.
- * (see boot.s for further explanation) */
+ * paging structures (in the current address space) starting at 0xffc00000,
+ * through the CPU interpreting the page directory as a page table and
+ * therefore the page tables it points to as its pages. */
 static uint32_t *page_directory = (uint32_t *)0xfffff000;
 
 static uint32_t *page_tables = (uint32_t *)0xffc00000;

@@ -3,6 +3,41 @@
 
 #include <stdint.h>
 
+/*
+ * Memory map
+ *
+ * 0x00000000: NULL (invalid, never mapped)
+ * 
+ * 0x00100000: User binary loaded here, followed immediately by user heap.
+ * This is in the spirit of the original UNIX systems where the "heap" was just
+ * the "data segment" of the binary dynamically extended with `sbrk()`.
+ * 
+ * 0xbfffffff: User stack starts here and grows downwards.
+ * NOTE: The kernel allocates pages for the stack automatically on page fault.
+ * It needs to check if heap and stack are going to collide!
+ * 
+ * Max size of user memory (binary + heap + stack) = 3GiB
+ * 
+ * 0xc0000000: Start of physical memory. BIOS and bootloader memory.
+ * 0xc0100000: Kernel binary loaded here
+ * Max size of kernel binary = 256MiB (sufficient! Linux + initrd ~ 110MiB)
+ * 
+ * 0xd0000000-0xefffffff: Kernel heap
+ * Max size of kernel heap = 512MiB (sufficient?)
+ * 
+ * 0xf0000000-0xffbfffff: Memory-mapped devices
+ * 
+ * 0xffc00000: Page tables (see mem.c for how this works)
+ * 
+ * 0xfffff000: Page directory
+ */
+#define U_MEM_START 0x00100000
+#define U_MEM_END 0xbfffffff
+#define K_MEM_START 0xc0000000
+#define K_MEM_HEAP_START 0xd0000000
+#define K_MEM_HEAP_END 0xefffffff
+#define K_MEM_DEV_START 0xf0000000
+
 enum page_flags {
     PG_PRES = 1,
     PG_RW = 2,
