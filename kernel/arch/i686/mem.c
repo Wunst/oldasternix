@@ -164,4 +164,6 @@ void *mem_alloc_pages(uint32_t virt_min, uint32_t virt_end_max, size_t n,
     next:
         ;
     }
+
+    return NULL;
 }
