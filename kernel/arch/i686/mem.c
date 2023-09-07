@@ -1,7 +1,6 @@
 /*
  * TODO:
  *  - support huge pages
- *  - optimize allocation of multiple pages at once (?)
  */
 
 #include <x86/mem.h>
@@ -124,4 +123,45 @@ void *mem_map_page(uint32_t virt_min, uint32_t phys, enum page_flags flags)
     }
 
     return NULL;
+}
+
+void *mem_alloc_pages(uint32_t virt_min, uint32_t virt_end_max, size_t n,
+        enum page_flags flags)
+{
+    /* TODO: DRY this with `mem_map_page()` */
+
+    for (uint32_t virt = virt_min; virt < virt_end_max; virt += PAGE_SIZE) {
+        /* TODO: Optimize checks if page used? */
+        for (uint32_t single = virt; single < virt + n; single += PAGE_SIZE) {
+            if (single > virt_end_max)
+                return NULL;
+            
+            if ((page_directory[single / HUGE_PAGE_SIZE] & PG_PRES) == 0)
+                continue;
+            
+            if ((page_tables[single / PAGE_SIZE] & PG_PRES)) {
+                /* Continue after the used page. */
+                virt = single;
+                goto next;
+            }
+        }
+
+        /* No used page within reach - we've found space! */
+        for (uint32_t single = virt; single < virt + n; single += PAGE_SIZE) {
+            int pdi = single / HUGE_PAGE_SIZE;
+            if ((page_directory[pdi] & PG_PRES) == 0) {
+                page_directory[pdi] = alloc_phys() | PAGE_DIRECTORY_FLAGS;
+                memset(&page_tables[pdi * PAGE_TABLE_SIZE], 0, PAGE_SIZE);
+            }
+
+            int pti = single / PAGE_SIZE;
+            if ((page_tables[pti] & PG_PRES) == 0) {
+                page_tables[pti] = alloc_phys() | flags;
+            }
+        }
+        return (void *)virt;
+
+    next:
+        ;
+    }
 }

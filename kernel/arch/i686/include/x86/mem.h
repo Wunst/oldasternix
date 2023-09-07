@@ -1,6 +1,7 @@
 #ifndef MEM_H
 #define MEM_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 /*
@@ -62,5 +63,11 @@ void mem_set_bounds(uint32_t lower, uint32_t upper);
 void mem_set_used(uint32_t phys, uint32_t min_size);
 void mem_init(void);
 void *mem_map_page(uint32_t virt_min, uint32_t phys, enum page_flags flags);
+
+/*
+ * Allocates `n` physical pages and maps them in contiguous virtual memory.
+ */
+void *mem_alloc_pages(uint32_t virt_min, uint32_t virt_end_max, size_t n,
+        enum page_flags flags);
 
 #endif
