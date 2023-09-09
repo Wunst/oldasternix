@@ -7,6 +7,9 @@
 
 #include <drivers/tty.h>
 #include <drivers/ps2_kb.h>
+#include <fs/fs_dentry.h>
+#include <fs/fs_driver.h>
+#include <fs/fs_inode.h>
 #include <x86/interrupts.h>
 #include <x86/mem.h>
 
@@ -18,6 +21,8 @@ struct multiboot_info {
 
 /* defined in boot0.s */
 extern void halt_loop(void);
+
+extern struct fs_driver tmpfs_driver;
 
 void hlinit(struct multiboot_info *mbi_phys)
 {
@@ -64,6 +69,26 @@ void hlinit(struct multiboot_info *mbi_phys)
     ps2_kb_driversetup();
 
     printf("Hello, world!\n");
+
+    struct fs_instance *fs = tmpfs_driver.mount(NULL, 0, NULL);
+    fs->driver->create(fs->root, "foo", IT_DIR);
+    
+    struct dentry *foo = fs->driver->lookup(fs->root, "foo");
+    fs->driver->create(foo->ino, "bar", IT_REG);
+    fs->driver->create(foo->ino, "baz", IT_REG);
+
+    char *names[2];
+    fs->driver->readdir(foo->ino, names, 2);
+    printf("%s\n", names[0]);
+    printf("%s\n", names[1]);
+
+    struct dentry *baz = fs->driver->lookup(foo->ino, "baz");
+    fs->driver->write(baz->ino, 0, "Hello, files!\n", 15);
+    
+    char buf[15];
+    fs->driver->read(baz->ino, 0, buf, 15);
+
+    printf("%s\n", buf);
 
     halt_loop();
 }
