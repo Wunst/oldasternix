@@ -4,6 +4,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define PAGE_SIZE 4096
+#define HUGE_PAGE_SIZE 4194304
+
 /*
  * Memory map
  *
@@ -62,12 +65,19 @@ enum page_flags {
 void mem_set_bounds(uint32_t lower, uint32_t upper);
 void mem_set_used(uint32_t phys, uint32_t min_size);
 void mem_init(void);
+
+/*
+ * Maps a physical page starting at `phys` at the NEXT FREE virtual page,
+ * searching from `virt_min`.
+ */
 void *mem_map_page(uint32_t virt_min, uint32_t phys, enum page_flags flags);
 
 /*
- * Allocates `n` physical pages and maps them in contiguous virtual memory.
+ * Allocates and maps `n` physical pages starting at `virt`. Returns a pointer
+ * to `virt` if successful, or NULL if memory is already taken, or the memory
+ * region would reach beyond `virt_end_max`, or `virt` isn't page aligned.
  */
-void *mem_alloc_pages(uint32_t virt_min, uint32_t virt_end_max, size_t n,
+void *mem_alloc(uint32_t virt, uint32_t virt_end_max, size_t n,
         enum page_flags flags);
 
 #endif
