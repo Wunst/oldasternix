@@ -162,7 +162,7 @@ int tmpfs_write(struct inode *ifile, off_t pos, const char *buf, size_t n)
     if (pos + n >= ifile->size)
         n = ifile->size - pos;
     
-    memcpy(f->buf, buf, n);
+    memcpy(&f->buf[pos], buf, n);
     return n;
 }
 
@@ -176,7 +176,7 @@ int tmpfs_read(struct inode *ifile, off_t pos, char *buf, size_t n)
     if (pos + n >= ifile->size)
         n = ifile->size - pos;
     
-    memcpy(buf, f->buf, n);
+    memcpy(buf, &f->buf[pos], n);
     return n;
 }
 
