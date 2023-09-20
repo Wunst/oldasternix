@@ -6,6 +6,8 @@
 
 #ifdef __is_kernel
 
+#include <stdio.h>
+
 #include <x86/mem.h>
 
 enum alloc_status {
@@ -70,7 +72,7 @@ void *malloc(size_t size)
     /* If we have much more space than required for the allocation, split the
      * block in two. */
     if (hdr->size >= size + 2 * sizeof(struct alloc_header)) {
-        size_t remaining = hdr->size - (size + 2 * sizeof(struct alloc_header));
+        size_t remaining = hdr->size - (size + sizeof(struct alloc_header));
 
         hdr->size = size;
 
@@ -87,7 +89,7 @@ void *malloc(size_t size)
             next_next->prev_header = next_hdr;
         }
     }
-    
+
     return &hdr[1];
 }
 
