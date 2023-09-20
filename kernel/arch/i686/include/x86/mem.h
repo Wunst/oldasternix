@@ -62,8 +62,18 @@ enum page_flags {
     PAGE_DIRECTORY_FLAGS = PG_PRES | PG_RW | PG_US,
 };
 
-void mem_set_bounds(uint32_t lower, uint32_t upper);
-void mem_set_used(uint32_t phys, uint32_t min_size);
+/*
+ * Tells the memory manager the basic memory regions. (x86 specific)
+ * `lower`: size of lower memory (<1MiB, starts at 0)
+ * `upper`: size of upper memory (>1MiB, starts at 1MiB)
+ * e.g. on a system with video memory starting at 0xa0000 GRUB does not use
+ * the memory map for this but sets the `basic_meminfo#lower` field to 0xa0000.
+ * 
+ * NEEDS to be called before any physical memory allocations happen.
+ */
+void mem_init_regions(uint32_t lower, uint32_t upper);
+
+void mem_set_used(uint64_t phys, uint64_t min_size);
 void mem_init(void);
 
 /*

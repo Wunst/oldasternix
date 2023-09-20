@@ -13,6 +13,7 @@
 #include <stdio.h>
 
 /* The portion of physical memory that is guaranteed to be usable */
+/* TODO: Get rid of this. Are systems even required to have high memory? */
 #define PROT_PHYS_START 0x00100000
 #define PROT_PHYS_END 0x00f00000
 
@@ -23,7 +24,7 @@
 /* defined in linker.ld */
 extern char __kernel_virtual_offset, __kernel_start, __kernel_end;
 
-static uint32_t lower_bnd = PROT_PHYS_START, upper_bnd = PROT_PHYS_END;
+static uint32_t lower_bound = PROT_PHYS_START, upper_bound = PROT_PHYS_END;
 
 /* By mapping the last PDE to the page directory itself, we can access all
  * paging structures (in the current address space) starting at 0xffc00000,
@@ -55,11 +56,7 @@ static void set_phys_used(uint32_t phys, bool used)
 static uint32_t alloc_phys()
 {
     uint32_t ret;
-    /* TODO: Check physical memory layout (ACPI or GRUB).
-     * For now, we only use a single portion of memory (0x00100000-0x00efffff)
-     * that is guaranteed to be free for use, which is going to waste a lot (in
-     * fact, most) of physical memory space. */
-    for (ret = lower_bnd; ret < upper_bnd; ret += PAGE_SIZE) {
+    for (ret = 0; ret < 0xfffff000; ret += PAGE_SIZE) {
         if (!is_phys_used(ret)) {
             set_phys_used(ret, true);
             return ret;
@@ -68,19 +65,36 @@ static uint32_t alloc_phys()
     return -1;
 }
 
-void mem_set_bounds(uint32_t lower, uint32_t upper)
+void mem_init_regions(uint32_t lower, uint32_t upper)
 {
-    lower_bnd = lower;
-    upper_bnd = upper;
+    /* Mark memory between the end of lower memory and start of upper memory as
+     * used (e.g. video memory). */
+    for (uint32_t page = lower & ~4095; page < 0x100000; page += PAGE_SIZE)
+        set_phys_used(page, true);
+    
+    /* Set the upper bound to the end of upper memory. */
+    upper_bound = 0x100000 + upper;
+
+    /* Set the lower bound to lower memory. It is safe to use now. */
+    lower_bound = 0;
 }
 
-void mem_set_used(uint32_t phys, uint32_t min_size)
+void mem_set_used(uint64_t phys, uint64_t min_size)
 {
+    /* Memory map is 64-bit, ignore everything outside of our 32-bit address
+     * space. */
+    if (phys > UINT32_MAX)
+        return;
+    
+    /* Cut off larger regions to 32-bit. */
+    uint64_t max = phys + min_size;
+    max = (max > UINT32_MAX) ? UINT32_MAX : max;
+    
     uint32_t page = phys & ~4095;
     do {
         set_phys_used(page, true);
         page += PAGE_SIZE;
-    } while (page < phys + min_size);
+    } while (page < max && page != 0);
 }
 
 void mem_init()

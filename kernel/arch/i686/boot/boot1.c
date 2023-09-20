@@ -1,7 +1,9 @@
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
 #include <stdio.h>
+#include <string.h>
 
 #include <vendor/grub/multiboot2.h>
 
@@ -43,7 +45,7 @@ void hlinit(struct multiboot_info *mbi_phys)
 
         switch (tag->type) {
         case MULTIBOOT_TAG_TYPE_BASIC_MEMINFO:
-            mem_set_bounds(
+            mem_init_regions(
                 ((struct multiboot_tag_basic_meminfo *)tag)->mem_lower,
                 ((struct multiboot_tag_basic_meminfo *)tag)->mem_upper);
             break;
@@ -64,6 +66,8 @@ void hlinit(struct multiboot_info *mbi_phys)
         }   
     }
 
+    /* TODO: Kernel panic if no memory info */
+
     setup_interrupts();
 
     ps2_kb_driversetup();
@@ -74,21 +78,30 @@ void hlinit(struct multiboot_info *mbi_phys)
     fs->driver->create(fs->root, "foo", IT_DIR);
     
     struct dentry *foo = fs->driver->lookup(fs->root, "foo");
-    fs->driver->create(foo->ino, "bar", IT_REG);
-    fs->driver->create(foo->ino, "baz", IT_REG);
 
-    char *names[2];
-    fs->driver->readdir(foo->ino, names, 2);
-    printf("%s\n", names[0]);
-    printf("%s\n", names[1]);
+    char buf[7];
+    strcpy(buf, "bar000");
+    for (int i = 0; i < 1000; i++) {
+        buf[3] = '0' + i / 100;
+        buf[4] = '0' + (i % 100) / 10;
+        buf[5] = '0' + (i % 10);
+        fs->driver->create(foo->ino, buf, IT_REG);
+        struct dentry *file = fs->driver->lookup(foo->ino, buf);
+        fs->driver->write(file->ino, 0, "Hello, ", 7);
+        fs->driver->write(file->ino, 7, buf, 7);
+    }
 
-    struct dentry *baz = fs->driver->lookup(foo->ino, "baz");
-    fs->driver->write(baz->ino, 0, "Hello, files!\n", 15);
-    
-    char buf[15];
-    fs->driver->read(baz->ino, 0, buf, 15);
-
-    printf("%s\n", buf);
+    for (int i = 0; i < 1000; i++) {
+        buf[3] = '0' + i / 100;
+        buf[4] = '0' + (i % 100) / 10;
+        buf[5] = '0' + (i % 10);
+        if (i == 999)
+            printf("");
+        struct dentry *file = fs->driver->lookup(foo->ino, buf);
+        char new_buf[14];
+        fs->driver->read(file->ino, 0, new_buf, 14);
+        printf("%s : %s\n", buf, new_buf);
+    }
 
     halt_loop();
 }
