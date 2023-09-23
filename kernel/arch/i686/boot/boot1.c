@@ -75,33 +75,40 @@ void hlinit(struct multiboot_info *mbi_phys)
     printf("Hello, world!\n");
 
     struct fs_instance *fs = tmpfs_driver.mount(NULL, 0, NULL);
-    fs->driver->create(fs->root, "foo", IT_DIR);
-    
-    struct dentry *foo = fs->driver->lookup(fs->root, "foo");
 
-    char buf[7];
-    strcpy(buf, "bar000");
-    for (int i = 0; i < 1000; i++) {
-        buf[3] = '0' + i / 100;
-        buf[4] = '0' + (i % 100) / 10;
-        buf[5] = '0' + (i % 10);
-        fs->driver->create(foo->ino, buf, IT_REG);
-        struct dentry *file = fs->driver->lookup(foo->ino, buf);
-        fs->driver->write(file->ino, 0, "Hello, ", 7);
-        fs->driver->write(file->ino, 7, buf, 7);
-    }
+    fs->driver->create(fs->root, "lorem.txt", IT_REG);
 
-    for (int i = 0; i < 1000; i++) {
-        buf[3] = '0' + i / 100;
-        buf[4] = '0' + (i % 100) / 10;
-        buf[5] = '0' + (i % 10);
-        if (i == 999)
-            printf("");
-        struct dentry *file = fs->driver->lookup(foo->ino, buf);
-        char new_buf[14];
-        fs->driver->read(file->ino, 0, new_buf, 14);
-        printf("%s : %s\n", buf, new_buf);
-    }
+    const char *lorem = "Lorem ipsum dolor sit amet, consectetur adipiscing "
+            "elit. In fermentum ac magna at varius. Vestibulum tortor tellus, "
+            "cursus id massa sit amet, placerat ullamcorper risus. Nullam ac "
+            "neque vel nibh pellentesque dapibus. Donec ac eros id eros "
+            "faucibus tincidunt. Fusce faucibus dapibus tincidunt. Mauris "
+            "mollis libero id magna ultricies vestibulum. Donec cursus ante "
+            "urna, ac tristique metus aliquam mattis. Praesent ut tempus sem, "
+            "eget lobortis felis. Praesent sed nibh ipsum. Pellentesque vitae "
+            "ante sem. Ut lobortis ex purus, in varius nunc ultricies eget.";
+
+    struct dentry *de = fs->driver->lookup(fs->root, "lorem.txt");
+    de->ino->fs_on->driver->write(de->ino, 0, "0001", 4);
+    de->ino->fs_on->driver->write(de->ino, 3, "23", 2);
+    if (de->ino->fs_on->driver->write(de->ino, 6, "0001", 2) > 0)
+        printf("ERROR");
+    de->ino->fs_on->driver->write(de->ino, 5, lorem, 556);
+    de->ino->fs_on->driver->write(de->ino, 560, "0002", 4);
+    de->ino->fs_on->driver->write(de->ino, 564, lorem, 556);
+    de->ino->fs_on->driver->write(de->ino, 1119, "0003", 4);
+    de->ino->fs_on->driver->write(de->ino, 1123, lorem, 4);
+    de->ino->fs_on->driver->write(de->ino, 1678, "0004", 4);
+    de->ino->fs_on->driver->write(de->ino, 1683, lorem, 556);
+    de->ino->fs_on->driver->write(de->ino, 2234, lorem, 556);
+    de->ino->fs_on->driver->write(de->ino, 2789, lorem, 556);
+    de->ino->fs_on->driver->write(de->ino, 3344, lorem, 556);
+    de->ino->fs_on->driver->write(de->ino, 3899, "0005", 4);
+    de->ino->fs_on->driver->write(de->ino, 3903, lorem, 556);
+
+    char buf[4200];
+    de->ino->fs_on->driver->read(de->ino, 0, buf, 4200);
+    printf("%s\n", buf);
 
     halt_loop();
 }

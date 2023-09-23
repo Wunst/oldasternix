@@ -1,11 +1,14 @@
 #include <stddef.h>
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <fs/fs_dentry.h>
 #include <fs/fs_driver.h>
 #include <fs/fs_inode.h>
 #include <fs/fs_types.h>
+
+#define TMPFS_BLK_SIZE 4096
 
 extern struct fs_driver tmpfs_driver;
 
@@ -19,9 +22,14 @@ struct tmpfs_idir {
     struct tmpfs_dentry *first;
 };
 
+struct tmpfs_blk {
+    char buf[TMPFS_BLK_SIZE];
+    struct tmpfs_blk *nextblk;
+};
+
 struct tmpfs_ifile {
     struct inode base;
-    char buf[1024];
+    struct tmpfs_blk firstblk;
 };
 
 static void add_to_dir(struct tmpfs_idir *dir, const char *name,
@@ -47,6 +55,19 @@ static void add_to_dir(struct tmpfs_idir *dir, const char *name,
             ;
         last->next = de;
     }
+}
+
+static struct tmpfs_blk *find_blk(struct tmpfs_ifile *file, off_t pos)
+{
+    struct tmpfs_blk *ret = &file->firstblk;
+    
+    for (off_t o = TMPFS_BLK_SIZE; o <= pos; o += TMPFS_BLK_SIZE) {
+        ret = ret->nextblk;
+        if (!ret)
+            break;
+    }
+
+    return ret;
 }
 
 struct fs_instance *tmpfs_mount(struct file *file, int flags, void *args)
@@ -92,9 +113,10 @@ int tmpfs_create(struct inode *idir, const char *name, mode_t mode)
         f->base.uid = 0;
         f->base.gid = 0;
         f->base.firstblk = 0;
-        f->base.size = 1024;
+        f->base.size = 0;
 
-        memset(f->buf, 0, 1024);
+        memset(f->firstblk.buf, 0, TMPFS_BLK_SIZE);
+        f->firstblk.nextblk = NULL;
 
         add_to_dir((struct tmpfs_idir *)idir, name, &f->base);
 
@@ -157,12 +179,54 @@ int tmpfs_write(struct inode *ifile, off_t pos, const char *buf, size_t n)
     if ((ifile->mode & IT_TYPE) != IT_REG)
         return -1;
     
+    if (pos > ifile->size)
+        return -1;
+    
+    if (n == 0)
+        return 0;
+    
     struct tmpfs_ifile *f = (struct tmpfs_ifile *)ifile;
 
-    if (pos + n >= ifile->size)
-        n = ifile->size - pos;
+    /* Find start block. Fails if `pos == size == capacity`. In this case... */
+    struct tmpfs_blk *blk = find_blk(f, pos);
+    if (!blk) {
+        /* ...find block before that (last block)... */
+        blk = find_blk(f, pos - 1);
+        
+        /* ...allocate a new one... */
+        blk->nextblk = malloc(sizeof(struct tmpfs_blk));
+        blk = blk->nextblk;
+        
+        /* ...and initialize it. */
+        memset(blk->buf, 0, TMPFS_BLK_SIZE);
+        blk->nextblk = NULL;
+    }
+
+    size_t end = pos + n;
+
+    /* Write everything that fits in the first block. */
+    size_t first_slice = TMPFS_BLK_SIZE - (pos % TMPFS_BLK_SIZE);
+    first_slice = n < first_slice ? n : first_slice;
+    memcpy(blk->buf + pos % TMPFS_BLK_SIZE, buf, first_slice);
+    pos += first_slice;
+    buf += first_slice;
+
+    /* Now `pos % blksize == 0` and we can write block by block. */
+    while (pos < end) {
+        /* If no block, allocate one. */
+        if (!blk->nextblk)
+            blk->nextblk = malloc(sizeof(struct tmpfs_blk));
+        
+        blk = blk->nextblk;
+
+        memcpy(blk->buf, buf, n < TMPFS_BLK_SIZE ? n : TMPFS_BLK_SIZE);
+        pos += TMPFS_BLK_SIZE;
+        buf += TMPFS_BLK_SIZE;
+    }
+
+    /* Update file size. */
+    ifile->size = end < ifile->size ? ifile->size : end;
     
-    memcpy(&f->buf[pos], buf, n);
     return n;
 }
 
@@ -170,13 +234,36 @@ int tmpfs_read(struct inode *ifile, off_t pos, char *buf, size_t n)
 {
     if ((ifile->mode & IT_TYPE) != IT_REG)
         return -1;
-    
-    struct tmpfs_ifile *f = (struct tmpfs_ifile *)ifile;
 
     if (pos + n >= ifile->size)
         n = ifile->size - pos;
     
-    memcpy(buf, &f->buf[pos], n);
+    if (pos >= ifile->size)
+        return -1;
+    
+    struct tmpfs_ifile *f = (struct tmpfs_ifile *)ifile;
+    
+    struct tmpfs_blk *blk = find_blk(f, pos);
+    if (!blk)
+        return -1;
+    
+    size_t end = pos + n;
+
+    /* Read everything from the first block: */
+    size_t first_slice = TMPFS_BLK_SIZE - (pos % TMPFS_BLK_SIZE);
+    first_slice = n < first_slice ? n : first_slice;
+    memcpy(buf, blk->buf + pos % TMPFS_BLK_SIZE, first_slice);
+    pos += first_slice;
+    buf += first_slice;
+
+    /* Now `pos % blksize == 0` and we can write block by block. */
+    while (pos < end) {
+        blk = blk->nextblk;
+        memcpy(buf, blk->buf, n < TMPFS_BLK_SIZE ? n : TMPFS_BLK_SIZE);
+        pos += TMPFS_BLK_SIZE;
+        buf += TMPFS_BLK_SIZE;
+    }
+
     return n;
 }
 
