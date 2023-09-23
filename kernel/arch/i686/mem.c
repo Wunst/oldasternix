@@ -141,29 +141,31 @@ void *mem_alloc(uint32_t virt, uint32_t virt_end_max, size_t n,
 {
     /* TODO: DRY this with `mem_map_page()` */
 
+    int page_start = virt / PAGE_SIZE;
+    int page_max = virt_end_max / PAGE_SIZE;
+
     /* TODO: Optimize checks if page used? */
-    for (uint32_t single = virt; single < virt + n; single += PAGE_SIZE) {
-        if (single > virt_end_max)
+    for (int page = page_start; (size_t)page < page_start + n; page++) {
+        if (page > page_max)
             return NULL;
         
-        if ((page_directory[single / HUGE_PAGE_SIZE] & PG_PRES) == 0)
+        if ((page_directory[page / 1024] & PG_PRES) == 0)
             continue;
         
-        if ((page_tables[single / PAGE_SIZE] & PG_PRES))
+        if ((page_tables[page] & PG_PRES))
             return NULL;
     }
 
     /* No used page within reach - we've found space! */
-    for (uint32_t single = virt; single < virt + n; single += PAGE_SIZE) {
-        int pdi = single / HUGE_PAGE_SIZE;
+    for (int page = page_start; (size_t)page < page_start + n; page++) {
+        int pdi = page / 1024;
         if ((page_directory[pdi] & PG_PRES) == 0) {
             page_directory[pdi] = alloc_phys() | PAGE_DIRECTORY_FLAGS;
-            memset(&page_tables[pdi * PAGE_TABLE_SIZE], 0, PAGE_SIZE);
+            memset(&page_tables[page], 0, PAGE_SIZE);
         }
 
-        int pti = single / PAGE_SIZE;
-        if ((page_tables[pti] & PG_PRES) == 0) {
-            page_tables[pti] = alloc_phys() | flags;
+        if ((page_tables[page] & PG_PRES) == 0) {
+            page_tables[page] = alloc_phys() | flags;
         }
     }
     return (void *)virt;
