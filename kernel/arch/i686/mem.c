@@ -1,7 +1,6 @@
 /*
  * TODO:
  *  - support huge pages
- *  - optimize allocation of multiple pages at once (?)
  */
 
 #include <x86/mem.h>
@@ -13,10 +12,8 @@
 #include <string.h>
 #include <stdio.h>
 
-#define PAGE_SIZE 4096
-#define HUGE_PAGE_SIZE 4194304
-
 /* The portion of physical memory that is guaranteed to be usable */
+/* TODO: Get rid of this. Are systems even required to have high memory? */
 #define PROT_PHYS_START 0x00100000
 #define PROT_PHYS_END 0x00f00000
 
@@ -27,9 +24,12 @@
 /* defined in linker.ld */
 extern char __kernel_virtual_offset, __kernel_start, __kernel_end;
 
+static uint32_t lower_bound = PROT_PHYS_START, upper_bound = PROT_PHYS_END;
+
 /* By mapping the last PDE to the page directory itself, we can access all
- * paging structures (in the current address space) starting at 0xffc00000.
- * (see boot.s for further explanation) */
+ * paging structures (in the current address space) starting at 0xffc00000,
+ * through the CPU interpreting the page directory as a page table and
+ * therefore the page tables it points to as its pages. */
 static uint32_t *page_directory = (uint32_t *)0xfffff000;
 
 static uint32_t *page_tables = (uint32_t *)0xffc00000;
@@ -56,17 +56,45 @@ static void set_phys_used(uint32_t phys, bool used)
 static uint32_t alloc_phys()
 {
     uint32_t ret;
-    /* TODO: Check physical memory layout (ACPI or GRUB).
-     * For now, we only use a single portion of memory (0x00100000-0x00efffff)
-     * that is guaranteed to be free for use, which is going to waste a lot (in
-     * fact, most) of physical memory space. */
-    for (ret = PROT_PHYS_START; ret < PROT_PHYS_END; ret += PAGE_SIZE) {
+    for (ret = 0; ret < 0xfffff000; ret += PAGE_SIZE) {
         if (!is_phys_used(ret)) {
             set_phys_used(ret, true);
             return ret;
         }
     }
     return -1;
+}
+
+void mem_init_regions(uint32_t lower, uint32_t upper)
+{
+    /* Mark memory between the end of lower memory and start of upper memory as
+     * used (e.g. video memory). */
+    for (uint32_t page = lower & ~4095; page < 0x100000; page += PAGE_SIZE)
+        set_phys_used(page, true);
+    
+    /* Set the upper bound to the end of upper memory. */
+    upper_bound = 0x100000 + upper;
+
+    /* Set the lower bound to lower memory. It is safe to use now. */
+    lower_bound = 0;
+}
+
+void mem_set_used(uint64_t phys, uint64_t min_size)
+{
+    /* Memory map is 64-bit, ignore everything outside of our 32-bit address
+     * space. */
+    if (phys > UINT32_MAX)
+        return;
+    
+    /* Cut off larger regions to 32-bit. */
+    uint64_t max = phys + min_size;
+    max = (max > UINT32_MAX) ? UINT32_MAX : max;
+    
+    uint32_t page = phys & ~4095;
+    do {
+        set_phys_used(page, true);
+        page += PAGE_SIZE;
+    } while (page < max && page != 0);
 }
 
 void mem_init()
@@ -106,4 +134,39 @@ void *mem_map_page(uint32_t virt_min, uint32_t phys, enum page_flags flags)
     }
 
     return NULL;
+}
+
+void *mem_alloc(uint32_t virt, uint32_t virt_end_max, size_t n,
+        enum page_flags flags)
+{
+    /* TODO: DRY this with `mem_map_page()` */
+
+    int page_start = virt / PAGE_SIZE;
+    int page_max = virt_end_max / PAGE_SIZE;
+
+    /* TODO: Optimize checks if page used? */
+    for (int page = page_start; (size_t)page < page_start + n; page++) {
+        if (page > page_max)
+            return NULL;
+        
+        if ((page_directory[page / 1024] & PG_PRES) == 0)
+            continue;
+        
+        if ((page_tables[page] & PG_PRES))
+            return NULL;
+    }
+
+    /* No used page within reach - we've found space! */
+    for (int page = page_start; (size_t)page < page_start + n; page++) {
+        int pdi = page / 1024;
+        if ((page_directory[pdi] & PG_PRES) == 0) {
+            page_directory[pdi] = alloc_phys() | PAGE_DIRECTORY_FLAGS;
+            memset(&page_tables[page], 0, PAGE_SIZE);
+        }
+
+        if ((page_tables[page] & PG_PRES) == 0) {
+            page_tables[page] = alloc_phys() | flags;
+        }
+    }
+    return (void *)virt;
 }

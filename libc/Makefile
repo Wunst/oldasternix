@@ -1,7 +1,7 @@
 INCLUDES=-Iinclude
 CCFLAGS+=$(INCLUDES) -ffreestanding
 
-LIBK_INCLUDES=-I../kernel/include
+LIBK_INCLUDES=-I../kernel/include -I../kernel/arch/$(ARCH)/include
 LIBK_CCFLAGS=$(LIBK_INCLUDES) -D__is_kernel
 
 LIBS=-nostdlib -lgcc

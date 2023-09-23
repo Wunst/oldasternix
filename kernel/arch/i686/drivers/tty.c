@@ -28,7 +28,7 @@ static void tty_scroll(int lines)
 
 void tty_init()
 {
-    vga_buffer = mem_map_page(0xf0000000, 0xb8000, DEFAULT_PAGE_FLAGS);
+    vga_buffer = mem_map_page(K_MEM_DEV_START, 0xb8000, DEFAULT_PAGE_FLAGS);
 }
 
 void tty_putchar(char ch)
