@@ -1,8 +1,10 @@
 #include <stddef.h>
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include <fs/fs_dentry.h>
 #include <fs/fs_driver.h>
 #include <fs/fs_inode.h>
@@ -98,10 +100,25 @@ void tmpfs_destroy(struct fs_instance *fs)
     free(fs);
 }
 
+struct dentry *tmpfs_lookup(struct inode *idir, const char *name)
+{
+    struct tmpfs_dentry *de;
+    
+    for (de = ((struct tmpfs_idir *)idir)->first; de != NULL; de = de->next) {
+        if (strcmp(de->base.name, name) == 0)
+            return &de->base;
+    }
+
+    return NULL;
+}
+
 int tmpfs_create(struct inode *idir, const char *name, mode_t mode)
 {
     struct tmpfs_ifile *f;
     struct tmpfs_idir *d;
+
+    if (tmpfs_lookup(idir, name))
+        return -EEXIST;
 
     switch (mode & IT_TYPE) {
     case IT_REG:
@@ -142,20 +159,8 @@ int tmpfs_create(struct inode *idir, const char *name, mode_t mode)
         return 0;
 
     default:
-        return -1;
+        return -EPERM;
     }
-}
-
-struct dentry *tmpfs_lookup(struct inode *idir, const char *name)
-{
-    struct tmpfs_dentry *de;
-    
-    for (de = ((struct tmpfs_idir *)idir)->first; de != NULL; de = de->next) {
-        if (strcmp(de->base.name, name) == 0)
-            return &de->base;
-    }
-
-    return NULL;
 }
 
 int tmpfs_readdir(struct inode *idir, char **names, size_t n)
@@ -177,10 +182,10 @@ int tmpfs_readdir(struct inode *idir, char **names, size_t n)
 int tmpfs_write(struct inode *ifile, off_t pos, const char *buf, size_t n)
 {
     if ((ifile->mode & IT_TYPE) != IT_REG)
-        return -1;
+        return -EISDIR;
     
     if (pos > ifile->size)
-        return -1;
+        return -EFBIG;
     
     if (n == 0)
         return 0;
@@ -233,19 +238,19 @@ int tmpfs_write(struct inode *ifile, off_t pos, const char *buf, size_t n)
 int tmpfs_read(struct inode *ifile, off_t pos, char *buf, size_t n)
 {
     if ((ifile->mode & IT_TYPE) != IT_REG)
-        return -1;
+        return -EISDIR;
 
     if (pos + n >= ifile->size)
         n = ifile->size - pos;
     
-    if (pos >= ifile->size)
-        return -1;
+    if (pos >= ifile->size || n == 0)
+        return 0;
     
     struct tmpfs_ifile *f = (struct tmpfs_ifile *)ifile;
     
     struct tmpfs_blk *blk = find_blk(f, pos);
     if (!blk)
-        return -1;
+        return 0;
     
     size_t end = pos + n;
 
