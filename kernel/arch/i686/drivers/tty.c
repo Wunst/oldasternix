@@ -3,9 +3,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <errno.h>
 #include <string.h>
 
+#include <initcall.h>
 #include <x86/mem.h>
+#include <x86/pio.h>
 
 #define VGA_WIDTH 80
 #define VGA_HEIGHT 25
@@ -26,12 +29,7 @@ static void tty_scroll(int lines)
     pos -= points;
 }
 
-void tty_init()
-{
-    vga_buffer = mem_map_page(K_MEM_DEV_START, 0xb8000, DEFAULT_PAGE_FLAGS);
-}
-
-void tty_putchar(char ch)
+static void tty_putchar(char ch)
 {
     if (ch == '\n') {
         pos = (pos / VGA_WIDTH + 1) * VGA_WIDTH;
@@ -48,9 +46,33 @@ void tty_putchar(char ch)
     }
 }
 
-void tty_puts(const char *s)
+void tty_init()
 {
-    /* TODO: Make this more efficient? */
-    while (*s)
-        tty_putchar(*(s++));
+    /* Virtual console VGA display. */
+    vga_buffer = mem_map_page(K_MEM_DEV_START, 0xb8000, DEFAULT_PAGE_FLAGS);
+}
+
+int vconsole_write(const char *buf, size_t n)
+{
+    for (size_t i = 0; i < n; i++)
+        tty_putchar(*(buf++));
+    return n;
+}
+
+int serial_read(int port, char *buf, size_t n)
+{
+    /* TODO */
+    return 0;
+}
+
+int serial_write(int port, const char *buf, size_t n)
+{
+    /* IBM-PC COM ports */
+    static int ports[] = { 0x3f8, 0x2f8 };
+    /* TODO: Support more ports */
+    if (port > 2)
+        return -ENODEV;
+    for (size_t i = 0; i < n; i++)
+        outb(ports[port - 1], *(buf++));
+    return n;
 }

@@ -83,17 +83,25 @@ void hlinit(struct multiboot_info *mbi_phys)
     printf("Hello, world!\n");
 
     struct fs_instance *fs = tmpfs_driver.mount(NULL, 0, NULL);
-
-    fs->driver->create(fs->root, "urandom", IT_CHR);
     
-    struct dentry *de = fs->root->fs_on->driver->lookup(fs->root, "urandom");
-    de->ino->dev_type = DEV(1, 6);
-
-    char random[10];
-    de->ino->fs_on->driver->read(de->ino, 0, random, 10);
+    fs->driver->create(fs->root, "tty1", IT_CHR);
     
-    for (int i = 0; i < 10; i++)
-        printf("%d\n", random[i]);
+    struct dentry *de = fs->root->fs_on->driver->lookup(fs->root, "tty1");
+    de->ino->dev_type = DEV(2, 1);
+    de->ino->fs_on->driver->write(de->ino, 0, "\e[91;47mHello COM1", 19);
+
+    fs->driver->create(fs->root, "console", IT_CHR);
+    
+    de = fs->root->fs_on->driver->lookup(fs->root, "console");
+    de->ino->dev_type = DEV(2, 0);
+    de->ino->fs_on->driver->write(de->ino, 0, "Hello from character device", 27);
+
+    while (1) {
+        char buf[10];
+        int n;
+        n = de->ino->fs_on->driver->read(de->ino, 0, buf, 10);
+        de->ino->fs_on->driver->write(de->ino, 0, buf, n);
+    }
 
     halt_loop();
 }
