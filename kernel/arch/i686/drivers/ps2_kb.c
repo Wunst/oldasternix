@@ -1,11 +1,10 @@
-#include <drivers/ps2_kb.h>
-
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
 #include <stdio.h>
 
+#include <initcall.h>
 #include <drivers/kb.h>
 #include <x86/interrupts.h>
 #include <x86/pio.h>
@@ -329,8 +328,4 @@ void ps2_kb_driversetup()
     pic_clear_mask(IRQ1_KEYBOARD_DATA_READY);
 }
 
-void ps2_kb_drivercleanup()
-{
-    pic_set_mask(IRQ1_KEYBOARD_DATA_READY);
-    set_isr(IRQ_OFFSET + IRQ1_KEYBOARD_DATA_READY, NULL);
-}
+initcall(ps2_kb_driversetup);

@@ -9,7 +9,6 @@
 
 #include <drivers/major.h>
 #include <drivers/tty.h>
-#include <drivers/ps2_kb.h>
 #include <fs/fs_dentry.h>
 #include <fs/fs_driver.h>
 #include <fs/fs_inode.h>
@@ -74,8 +73,6 @@ void hlinit(struct multiboot_info *mbi_phys)
     /* TODO: Kernel panic if no memory info */
 
     setup_interrupts();
-
-    ps2_kb_driversetup();
 
     for (initcall_f *pp = &__initcall_start; pp < &__initcall_end; pp++)
         (**pp)();
