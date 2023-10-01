@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <drivers/driver.h>
 #include <fs/fs_dentry.h>
 #include <fs/fs_driver.h>
 #include <fs/fs_inode.h>
@@ -116,6 +117,7 @@ int tmpfs_create(struct inode *idir, const char *name, mode_t mode)
 {
     struct tmpfs_ifile *f;
     struct tmpfs_idir *d;
+    struct inode *nod;
 
     if (tmpfs_lookup(idir, name))
         return -EEXIST;
@@ -157,6 +159,21 @@ int tmpfs_create(struct inode *idir, const char *name, mode_t mode)
         add_to_dir((struct tmpfs_idir *)idir, name, &d->base);
 
         return 0;
+    
+    case IT_CHR:
+    case IT_BLK:
+        nod = malloc(sizeof(struct inode));
+
+        nod->nlink = 0;
+        nod->fs_on = idir->fs_on;
+        nod->mode = mode;
+        nod->uid = 0;
+        nod->gid = 0;
+        nod->dev_type = 0;
+
+        add_to_dir((struct tmpfs_idir *)idir, name, nod);
+
+        return 0;
 
     default:
         return -EPERM;
@@ -181,11 +198,14 @@ int tmpfs_readdir(struct inode *idir, char **names, size_t n)
 
 int tmpfs_write(struct inode *ifile, off_t pos, const char *buf, size_t n)
 {
-    if ((ifile->mode & IT_TYPE) != IT_REG)
+    if ((ifile->mode & IT_TYPE) == IT_DIR)
         return -EISDIR;
     
-    if (pos > ifile->size)
-        return -EFBIG;
+    if ((ifile->mode & IT_TYPE) == IT_CHR)
+        return write_char(ifile->dev_type, pos, buf, n);
+    
+    if ((ifile->mode & IT_TYPE) != IT_REG)
+        return -EPERM;
     
     if (n == 0)
         return 0;
@@ -237,8 +257,14 @@ int tmpfs_write(struct inode *ifile, off_t pos, const char *buf, size_t n)
 
 int tmpfs_read(struct inode *ifile, off_t pos, char *buf, size_t n)
 {
-    if ((ifile->mode & IT_TYPE) != IT_REG)
+    if ((ifile->mode & IT_TYPE) == IT_DIR)
         return -EISDIR;
+    
+    if ((ifile->mode & IT_TYPE) == IT_CHR)
+        return read_char(ifile->dev_type, pos, buf, n);
+    
+    if ((ifile->mode & IT_TYPE) != IT_REG)
+        return -EPERM;
 
     if (pos + n >= ifile->size)
         n = ifile->size - pos;

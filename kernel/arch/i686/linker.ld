@@ -22,6 +22,9 @@ SECTIONS
     .data ALIGN(4K) : AT(ADDR(.data) - __kernel_virtual_offset)
     {
         *(.data*)
+        PROVIDE(__initcall_start = .);
+        KEEP(*(.initcall))
+        PROVIDE(__initcall_end = .);
     }
 
     .bss ALIGN(4K) : AT(ADDR(.bss) - __kernel_virtual_offset)

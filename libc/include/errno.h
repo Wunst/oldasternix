@@ -57,4 +57,9 @@
  */
 #define ENOTDIR 9
 
+/*
+ * No such device.
+ */
+#define ENODEV 10
+
 #endif
