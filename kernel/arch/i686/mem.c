@@ -155,10 +155,6 @@ void *mem_map(uint32_t virt_min, size_t n, uint32_t phys,
     size_t page_end = page_start + n;
 
     for (size_t page = page_start; page < page_end; page++) {
-        if (is_phys_used(phys)) {
-            printf("warn: mem: physical memory already mapped: 0x%x\n", phys);
-        }
-
         if ((page_directory[page / 1024] & PG_PRES) == 0) {
             page_directory[page / 1024] = alloc_phys() | PAGE_DIRECTORY_FLAGS;
             memset(&page_tables[page], 0, PAGE_SIZE);
