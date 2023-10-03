@@ -53,15 +53,43 @@ static void set_phys_used(uint32_t phys, bool used)
     }
 }
 
+static bool is_virt_region_used(size_t *start_page, size_t n)
+{
+    size_t end_page = *start_page + n;
+
+    if (end_page < *start_page) {
+        /* Out of memory. */
+        *start_page = 0;
+        return true;
+    }
+
+    for (size_t page = *start_page; page < end_page; page++) {
+        if ((page_directory[page / 1024] & PG_PRES) == 0) {
+            /* Skip rest of this huge page as it can't be mapped, and continue. */
+            page |= (HUGE_PAGE_SIZE - 1) & ~4095;
+            continue;
+        }
+        
+        if ((page_tables[page] & PG_PRES)) {
+            /* Return next page to try for finding a free region. */
+            *start_page = page + 1;
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static uint32_t alloc_phys()
 {
     uint32_t ret;
-    for (ret = 0; ret < 0xfffff000; ret += PAGE_SIZE) {
+    for (ret = lower_bound; ret < upper_bound; ret += PAGE_SIZE) {
         if (!is_phys_used(ret)) {
             set_phys_used(ret, true);
             return ret;
         }
     }
+    printf("err: mem: out of memory (phys)\n");
     return -1;
 }
 
@@ -106,67 +134,58 @@ void mem_init()
     }
 }
 
-void *mem_map_page(uint32_t virt_min, uint32_t phys, enum page_flags flags)
+void *mem_map(uint32_t virt_min, size_t n, uint32_t phys,
+        enum page_flags flags)
 {
     if (phys % PAGE_SIZE != 0) {
         printf("err: mem: physical address not page aligned: 0x%x\n", phys);
         return NULL;
     }
-    
-    if (is_phys_used(phys)) {
-        printf("warn: mem: physical memory already mapped: 0x%x\n", phys);
-    }
 
-    uint32_t virt;
-    int pdi, pti;
-    for (virt = virt_min; virt < PAGE_LIMIT; virt += PAGE_SIZE) {
-        pdi = virt / HUGE_PAGE_SIZE;
-        if ((page_directory[pdi] & PG_PRES) == 0) {
-            page_directory[pdi] = alloc_phys() | PAGE_DIRECTORY_FLAGS;
-            memset(&page_tables[pdi * PAGE_TABLE_SIZE], 0, PAGE_SIZE);
-        }
+    size_t page_start = virt_min / PAGE_SIZE;
 
-        pti = virt / PAGE_SIZE;
-        if ((page_tables[pti] & PG_PRES) == 0) {
-            page_tables[pti] = phys | flags;
-            return (void *)virt;
+    /* Find a free page. */
+    while (is_virt_region_used(&page_start, n)) {
+        if (page_start == 0) {
+            printf("err: mem: out of memory (virt)\n");
+            return NULL;
         }
     }
 
-    return NULL;
+    size_t page_end = page_start + n;
+
+    for (size_t page = page_start; page < page_end; page++) {
+        if (is_phys_used(phys)) {
+            printf("warn: mem: physical memory already mapped: 0x%x\n", phys);
+        }
+
+        if ((page_directory[page / 1024] & PG_PRES) == 0) {
+            page_directory[page / 1024] = alloc_phys() | PAGE_DIRECTORY_FLAGS;
+            memset(&page_tables[page], 0, PAGE_SIZE);
+        }
+
+        page_tables[page] = phys | flags;
+        phys += PAGE_SIZE;
+    }
+
+    return (void *)((uint32_t)page_start * PAGE_SIZE);
 }
 
 void *mem_alloc(uint32_t virt, uint32_t virt_end_max, size_t n,
         enum page_flags flags)
 {
-    /* TODO: DRY this with `mem_map_page()` */
+    size_t page_start = virt / PAGE_SIZE;
+    size_t page_max = virt_end_max / PAGE_SIZE;
 
-    int page_start = virt / PAGE_SIZE;
-    int page_max = virt_end_max / PAGE_SIZE;
-
-    /* TODO: Optimize checks if page used? */
-    for (int page = page_start; (size_t)page < page_start + n; page++) {
-        if (page > page_max)
-            return NULL;
-        
-        if ((page_directory[page / 1024] & PG_PRES) == 0)
-            continue;
-        
-        if ((page_tables[page] & PG_PRES))
-            return NULL;
-    }
+    if (page_start + n > page_max)
+        return NULL;
+    
+    if (is_virt_region_used(&page_start, n))
+        return NULL;
 
     /* No used page within reach - we've found space! */
-    for (int page = page_start; (size_t)page < page_start + n; page++) {
-        int pdi = page / 1024;
-        if ((page_directory[pdi] & PG_PRES) == 0) {
-            page_directory[pdi] = alloc_phys() | PAGE_DIRECTORY_FLAGS;
-            memset(&page_tables[page], 0, PAGE_SIZE);
-        }
+    for (size_t page = page_start; page < page_start + n; page++)
+        mem_map(page * PAGE_SIZE, 1, alloc_phys(), flags);
 
-        if ((page_tables[page] & PG_PRES) == 0) {
-            page_tables[page] = alloc_phys() | flags;
-        }
-    }
     return (void *)virt;
 }

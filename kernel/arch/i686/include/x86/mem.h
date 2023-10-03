@@ -77,10 +77,11 @@ void mem_set_used(uint64_t phys, uint64_t min_size);
 void mem_init(void);
 
 /*
- * Maps a physical page starting at `phys` at the NEXT FREE virtual page,
- * searching from `virt_min`.
+ * Maps a physical memory region starting at `phys_start` and `n` pages long at
+ * the next sufficiently sized free address range, searching from `virt_min`.
  */
-void *mem_map_page(uint32_t virt_min, uint32_t phys, enum page_flags flags);
+void *mem_map(uint32_t virt_min, size_t n, uint32_t phys,
+        enum page_flags flags);
 
 /*
  * Allocates and maps `n` physical pages starting at `virt`. Returns a pointer

@@ -49,7 +49,7 @@ static void tty_putchar(char ch)
 void tty_init()
 {
     /* Virtual console VGA display. */
-    vga_buffer = mem_map_page(K_MEM_DEV_START, 0xb8000, DEFAULT_PAGE_FLAGS);
+    vga_buffer = mem_map(K_MEM_DEV_START, 1, 0xb8000, DEFAULT_PAGE_FLAGS);
 }
 
 int vconsole_write(const char *buf, size_t n)
