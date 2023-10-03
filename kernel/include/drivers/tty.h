@@ -6,6 +6,8 @@
  * low-level details such as writing to ports, a common driver
  * (kernel/drivers/char/tty.c) wraps them into a character device.
  */
+#ifndef TTY_H
+#define TTY_H
 
 #include <stddef.h>
 
@@ -16,3 +18,5 @@ int vconsole_write(const char *buf, size_t n);
 
 int serial_read(int port, char *buf, size_t n);
 int serial_write(int port, const char *buf, size_t n);
+
+#endif
