@@ -171,6 +171,22 @@ void *mem_map(uint32_t virt_min, size_t n, uint32_t phys,
     return (void *)((uint32_t)page_start * PAGE_SIZE);
 }
 
+void *mem_map_range(uint32_t virt_min, uint32_t phys_start, uint32_t phys_end,
+        enum page_flags flags)
+{
+    if (phys_end < phys_start) {
+        printf("err: mem: invalid region: %08X..%08X", phys_start, phys_end);
+        return NULL;
+    }
+
+    size_t page_offset = phys_start & 4095;
+    size_t n = (phys_end - phys_start + 4095) / PAGE_SIZE;
+
+    phys_start &= ~4096;
+
+    return mem_map(virt_min, n, phys_start, flags) + page_offset;
+}
+
 void *mem_alloc(uint32_t virt, uint32_t virt_end_max, size_t n,
         enum page_flags flags)
 {
