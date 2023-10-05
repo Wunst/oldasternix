@@ -4,7 +4,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <stdio.h>
+#include <string.h>
+
 #include <drivers/tty.h>
+
+#define VC_KEY_QUEUE_LEN 256
 
 static char keycode_to_char[2][256] = {{
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -32,7 +37,24 @@ static char keycode_to_char[2][256] = {{
     0, 0, 0, 0, '0', '.'
 }};
 
+static char input_queue[VC_KEY_QUEUE_LEN];
+static size_t queue_idx = 0;
+
 static uint8_t modifiers;
+
+int vconsole_read(char *buf, size_t n)
+{
+    n = queue_idx < n ? queue_idx : n;
+
+    /* Pass on `n` characters from queue. */
+    memcpy(buf, input_queue, n);
+
+    /* Move rest of queue forward. */
+    memmove(input_queue, &input_queue[n], queue_idx - n);
+    queue_idx -= n;
+
+    return n;
+}
 
 void kb_key_pressed(uint8_t keycode)
 {
@@ -63,11 +85,25 @@ void kb_key_pressed(uint8_t keycode)
     default:
         shift = kb_get_mod(SHIFT) ^ kb_get_mod(CAPS);
         ch = keycode_to_char[shift][keycode];
+
+        /* Ignore keys not mapped. */
+        if (!ch)
+            return;
+        
         if (kb_get_mod(CTRL))
             /* Clear bits 7..5 -> send corresponding C0 control character */
             ch &= 0x1f;
-        if (ch)
-            tty_putchar(ch);
+        
+        /*
+         * Enqueue character. If queue is full, throw away very old inputs.
+         * Those are probably void as no one has bothered to read them for 256
+         * keystrokes.
+         */
+        if (queue_idx >= VC_KEY_QUEUE_LEN) {
+            memmove(input_queue, &input_queue[1], queue_idx - 1);
+            queue_idx--;
+        }
+        input_queue[queue_idx++] = ch;
     }
 }
 

@@ -8,10 +8,14 @@
     .long header_length
     .long checksum
 
+    .set module_align_tag, 6
+    .set module_align_tag_length, 8
+    .long module_align_tag
+    .long module_align_tag_length
+
     .set end_tag, 0
     .set end_tag_length, 8
-
-    .word end_tag, 0
+    .long end_tag
     .long end_tag_length
 
     .set header_length, . - .multiboot

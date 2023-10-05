@@ -10,11 +10,21 @@ struct inode {
 
     mode_t mode;
 
+    ino_t ino;
+
+    dev_t dev_on;
+
     uid_t uid;
     gid_t gid;
 
-    off_t firstblk;
-    off_t size;
+    union {
+        struct {
+            off_t firstblk;
+            off_t size;
+        };
+
+        dev_t dev_type;
+    };
 
     struct fs_instance *fs_on;
 };

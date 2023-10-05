@@ -7,8 +7,9 @@
 
 #include <vendor/grub/multiboot2.h>
 
+#include <drivers/major.h>
 #include <drivers/tty.h>
-#include <drivers/ps2_kb.h>
+#include <drivers/block/ramdisk.h>
 #include <fs/fs_dentry.h>
 #include <fs/fs_driver.h>
 #include <fs/fs_inode.h>
@@ -25,6 +26,10 @@ struct multiboot_info {
 extern void halt_loop(void);
 
 extern struct fs_driver tmpfs_driver;
+
+typedef void (*initcall_f)(void);
+
+extern initcall_f __initcall_start, __initcall_end;
 
 void hlinit(struct multiboot_info *mbi_phys)
 {
@@ -63,6 +68,21 @@ void hlinit(struct multiboot_info *mbi_phys)
                     mem_set_used(mmap->addr, mmap->len);
             }
             break;
+        
+        case MULTIBOOT_TAG_TYPE_MODULE:
+            ;
+            /* Initial RAM disk is passed as a multiboot module. Map it
+             * immediately after the kernel binary. */
+            uint32_t start = ((struct multiboot_tag_module *)tag)->mod_start;
+            uint32_t end = ((struct multiboot_tag_module *)tag)->mod_end;
+
+            void *ramdisk = mem_map_range(K_MEM_START, start, end,
+                DEFAULT_PAGE_FLAGS);
+            
+            dev_t rd = add_ramdisk(PAGE_SIZE, ramdisk, end - start);
+            printf("info: added RAM disk as dev %d:%d\n", MAJOR(rd), MINOR(rd));
+
+            break;
         }   
     }
 
@@ -70,45 +90,40 @@ void hlinit(struct multiboot_info *mbi_phys)
 
     setup_interrupts();
 
-    ps2_kb_driversetup();
+    for (initcall_f *pp = &__initcall_start; pp < &__initcall_end; pp++)
+        (**pp)();
 
     printf("Hello, world!\n");
 
     struct fs_instance *fs = tmpfs_driver.mount(NULL, 0, NULL);
+    
+    fs->driver->create(fs->root, "tty1", IT_CHR);
+    
+    struct dentry *de = fs->root->fs_on->driver->lookup(fs->root, "tty1");
+    de->ino->dev_type = DEV(2, 1);
+    de->ino->fs_on->driver->write(de->ino, 0, "\e[91;47mHello COM1", 19);
 
-    fs->driver->create(fs->root, "lorem.txt", IT_REG);
+    fs->driver->create(fs->root, "console", IT_CHR);
+    
+    de = fs->root->fs_on->driver->lookup(fs->root, "console");
+    de->ino->dev_type = DEV(2, 0);
+    de->ino->fs_on->driver->write(de->ino, 0, "Hello from character device", 27);
 
-    const char *lorem = "Lorem ipsum dolor sit amet, consectetur adipiscing "
-            "elit. In fermentum ac magna at varius. Vestibulum tortor tellus, "
-            "cursus id massa sit amet, placerat ullamcorper risus. Nullam ac "
-            "neque vel nibh pellentesque dapibus. Donec ac eros id eros "
-            "faucibus tincidunt. Fusce faucibus dapibus tincidunt. Mauris "
-            "mollis libero id magna ultricies vestibulum. Donec cursus ante "
-            "urna, ac tristique metus aliquam mattis. Praesent ut tempus sem, "
-            "eget lobortis felis. Praesent sed nibh ipsum. Pellentesque vitae "
-            "ante sem. Ut lobortis ex purus, in varius nunc ultricies eget.";
+    fs->driver->create(fs->root, "ram0", IT_BLK);
 
-    struct dentry *de = fs->driver->lookup(fs->root, "lorem.txt");
-    de->ino->fs_on->driver->write(de->ino, 0, "0001", 4);
-    de->ino->fs_on->driver->write(de->ino, 3, "23", 2);
-    if (de->ino->fs_on->driver->write(de->ino, 6, "0001", 2) > 0)
-        printf("ERROR");
-    de->ino->fs_on->driver->write(de->ino, 5, lorem, 556);
-    de->ino->fs_on->driver->write(de->ino, 560, "0002", 4);
-    de->ino->fs_on->driver->write(de->ino, 564, lorem, 556);
-    de->ino->fs_on->driver->write(de->ino, 1119, "0003", 4);
-    de->ino->fs_on->driver->write(de->ino, 1123, lorem, 4);
-    de->ino->fs_on->driver->write(de->ino, 1678, "0004", 4);
-    de->ino->fs_on->driver->write(de->ino, 1683, lorem, 556);
-    de->ino->fs_on->driver->write(de->ino, 2234, lorem, 556);
-    de->ino->fs_on->driver->write(de->ino, 2789, lorem, 556);
-    de->ino->fs_on->driver->write(de->ino, 3344, lorem, 556);
-    de->ino->fs_on->driver->write(de->ino, 3899, "0005", 4);
-    de->ino->fs_on->driver->write(de->ino, 3903, lorem, 556);
-
-    char buf[4200];
-    de->ino->fs_on->driver->read(de->ino, 0, buf, 4200);
+    char buf[4097];
+    struct dentry *ram0 = fs->root->fs_on->driver->lookup(fs->root, "ram0");
+    ram0->ino->dev_type = DEV(1, 0);
+    ram0->ino->fs_on->driver->read(ram0->ino, 0, buf, 4096);
+    buf[4096] = 0;
     printf("%s\n", buf);
+
+    while (1) {
+        char buf[10];
+        int n;
+        n = de->ino->fs_on->driver->read(de->ino, 0, buf, 10);
+        de->ino->fs_on->driver->write(de->ino, 0, buf, n);
+    }
 
     halt_loop();
 }
