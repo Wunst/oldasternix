@@ -9,6 +9,7 @@
 
 #include <drivers/major.h>
 #include <drivers/tty.h>
+#include <drivers/block/ramdisk.h>
 #include <fs/fs_dentry.h>
 #include <fs/fs_driver.h>
 #include <fs/fs_inode.h>
@@ -67,6 +68,21 @@ void hlinit(struct multiboot_info *mbi_phys)
                     mem_set_used(mmap->addr, mmap->len);
             }
             break;
+        
+        case MULTIBOOT_TAG_TYPE_MODULE:
+            ;
+            /* Initial RAM disk is passed as a multiboot module. Map it
+             * immediately after the kernel binary. */
+            uint32_t start = ((struct multiboot_tag_module *)tag)->mod_start;
+            uint32_t end = ((struct multiboot_tag_module *)tag)->mod_end;
+
+            void *ramdisk = mem_map_range(K_MEM_START, start, end,
+                DEFAULT_PAGE_FLAGS);
+            
+            dev_t rd = add_ramdisk(PAGE_SIZE, ramdisk, end - start);
+            printf("info: added RAM disk as dev %d:%d\n", MAJOR(rd), MINOR(rd));
+
+            break;
         }   
     }
 
@@ -92,6 +108,15 @@ void hlinit(struct multiboot_info *mbi_phys)
     de = fs->root->fs_on->driver->lookup(fs->root, "console");
     de->ino->dev_type = DEV(2, 0);
     de->ino->fs_on->driver->write(de->ino, 0, "Hello from character device", 27);
+
+    fs->driver->create(fs->root, "ram0", IT_BLK);
+
+    char buf[4097];
+    struct dentry *ram0 = fs->root->fs_on->driver->lookup(fs->root, "ram0");
+    ram0->ino->dev_type = DEV(1, 0);
+    ram0->ino->fs_on->driver->read(ram0->ino, 0, buf, 4096);
+    buf[4096] = 0;
+    printf("%s\n", buf);
 
     while (1) {
         char buf[10];

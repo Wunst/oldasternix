@@ -49,4 +49,7 @@ typedef uint32_t gid_t;
 
 typedef uint64_t off_t;
 
+typedef uint32_t blksize_t;
+typedef uint32_t blkcnt_t;
+
 #endif
