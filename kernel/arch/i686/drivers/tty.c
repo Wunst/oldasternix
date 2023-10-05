@@ -34,7 +34,7 @@ static void tty_scroll(int lines)
     int points = lines * VGA_WIDTH;
     int bytes = points * 2;
     memmove(vga_buffer, &vga_buffer[points], VGA_BUFFER_SIZE * 2 - bytes);
-    memset(&vga_buffer[VGA_BUFFER_SIZE - points - 1], 0, bytes);
+    memset(&vga_buffer[VGA_BUFFER_SIZE - points], 0, bytes);
     pos -= points;
 }
 
