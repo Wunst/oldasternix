@@ -8,10 +8,14 @@
     .long header_length
     .long checksum
 
+    .set module_align_tag, 6
+    .set module_align_tag_length, 8
+    .long module_align_tag
+    .long module_align_tag_length
+
     .set end_tag, 0
     .set end_tag_length, 8
-
-    .word end_tag, 0
+    .long end_tag
     .long end_tag_length
 
     .set header_length, . - .multiboot
@@ -70,10 +74,20 @@ _start:
     movl $stack_top, %esp
     movl %esp, %ebp
 
-    /* Call into high level kernel. */
-    subl $0x08, %esp
+    /* Call into high level kernel.
+     * Calling convention is a bit weird: SYSTEM V ABI specifies the stack
+     * should be 16-byte aligned before using `call`, so we skip 12 bytes, then
+     * push our 4-byte argument. Then the C function expects us to push return
+     * address, but ljmp doesn't push any return address while lcall pushes an
+     * additional 4 bytes for return segment, breaking any argument passing
+     * entirely. So since we don't want to return anyways, we just skip another
+     * 4 bytes as a "pseudo-return address", then use a normal ljmp. */
+    subl $0x0c, %esp
     push %ebx
+    subl $0x04, %esp
     ljmp $k_code, $hlinit
+
+    /* unreachable */
 
     .section .text
     .global halt_loop

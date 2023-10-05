@@ -4,8 +4,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <errno.h>
 #include <string.h>
 
+#include <initcall.h>
 #include <x86/mem.h>
 #include <x86/pio.h>
 
@@ -49,7 +51,7 @@ void tty_init()
     vga_buffer = mem_map_page(0xf0000000, 0xb8000, DEFAULT_PAGE_FLAGS);
 }
 
-static void tty_putchar_internal(char ch)
+static void tty_putchar(char ch)
 {
     switch (ch) {
     case '\n': /* Newline */
@@ -81,15 +83,34 @@ static void tty_putchar_internal(char ch)
     }
 }
 
-void tty_putchar(char ch) {
-    tty_putchar_internal(ch);
-    tty_set_cursor(pos);
+void tty_init()
+{
+    /* Virtual console VGA display. */
+    vga_buffer = mem_map(K_MEM_DEV_START, 1, 0xb8000, DEFAULT_PAGE_FLAGS);
 }
 
-void tty_puts(const char *s)
+int vconsole_write(const char *buf, size_t n)
 {
-    /* TODO: Make this more efficient? */
-    while (*s)
-        tty_putchar_internal(*(s++));
+    for (size_t i = 0; i < n; i++)
+        tty_putchar(*(buf++));
     tty_set_cursor(pos);
+    return n;
+}
+
+int serial_read(int port, char *buf, size_t n)
+{
+    /* TODO */
+    return 0;
+}
+
+int serial_write(int port, const char *buf, size_t n)
+{
+    /* IBM-PC COM ports */
+    static int ports[] = { 0x3f8, 0x2f8 };
+    /* TODO: Support more ports */
+    if (port > 2)
+        return -ENODEV;
+    for (size_t i = 0; i < n; i++)
+        outb(ports[port - 1], *(buf++));
+    return n;
 }

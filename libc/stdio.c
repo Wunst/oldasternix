@@ -33,14 +33,13 @@ static int putiradix(unsigned x, int r, char alpha, int min, char filler)
 
 int putchar(int ch)
 {
-    tty_putchar((char) ch);
+    vconsole_write((char *) &ch, 1);
     return ch;
 }
 
 int puts(const char *s)
 {
-    tty_puts(s);
-    return strlen(s);
+    return vconsole_write(s, strlen(s));
 }
 
 int printf(const char *format, ...)
