@@ -1,5 +1,6 @@
 #include <drivers/tty.h>
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -16,9 +17,17 @@
 
 #define TAB_SIZE 8
 
+#define VGA_INDEX 0x3d4
+#define VGA_DATA 0x3d5
+#define VGA_CURSOR_LO 0x0f
+#define VGA_CURSOR_HI 0x0e
+
 static uint8_t format = 0x07;
 static uint16_t *vga_buffer;
 static size_t pos = 0;
+
+static bool processing_sequence;
+int num_par;
 
 static void tty_scroll(int lines)
 {
@@ -29,13 +38,36 @@ static void tty_scroll(int lines)
     pos -= points;
 }
 
+static void tty_set_cursor(size_t pos)
+{
+    outb(VGA_INDEX, VGA_CURSOR_LO);
+    outb(VGA_DATA, (uint8_t)pos);
+    outb(VGA_INDEX, VGA_CURSOR_HI);
+    outb(VGA_DATA, (uint8_t)(pos >> 8));
+}
+
 static void tty_putchar(char ch)
 {
-    if (ch == '\n') {
+    switch (ch) {
+    case '\n': /* Newline */
+    case '\r': /* Carriage Return (^M) */
         pos = (pos / VGA_WIDTH + 1) * VGA_WIDTH;
-    } else if (ch == '\t') {
+        break;
+
+    case '\t': /* Tab */
         pos = (pos / TAB_SIZE + 1) * TAB_SIZE;
-    } else {
+        break;
+    
+    case '\f': /* Form Feed (^L, Clear Screen) */
+        memset(vga_buffer, 0, VGA_BUFFER_SIZE * 2);
+        pos = 0;
+        break;
+    
+    case '\e': /* Escape (^[, Begin ANSI escape sequence) */
+        processing_sequence = true;
+        break;
+
+    default:
         vga_buffer[pos] = (uint16_t)format << 8 | ch;
         pos++;
     }
@@ -56,6 +88,7 @@ int vconsole_write(const char *buf, size_t n)
 {
     for (size_t i = 0; i < n; i++)
         tty_putchar(*(buf++));
+    tty_set_cursor(pos);
     return n;
 }
 
