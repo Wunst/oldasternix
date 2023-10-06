@@ -6,6 +6,14 @@ To create a well documented (as to be useful for educational purposes) clone of 
 
 This means that I do not make large-scale design decisions: I follow UNIX's for the better or worse, Keeping It Simple wherever possible.
 
+## Features
+
+* boots on x86 legacy BIOS (32-bit protected mode) using GRUB
+* can `printf` from the kernel
+* PS/2 keyboard driver (works *sort of*, but Legacy USB is as weird as ever)
+* a terrible VFS which is gonna be rewritten like three times
+  * but it supports block and character devices!
+
 ## How to build
 
 **If you're on Windows, you need to use either MINGW/MSYS/Cygwin or WSL2.**
@@ -21,12 +29,6 @@ make install-all
 ./grubiso.sh
 ```
 This creates an ISO and boots the system in QEMU (if installed).
-
-## Features
-
-* boots on x86 legacy BIOS (32-bit protected mode) using GRUB
-* can `printf` from the kernel
-* (the humble beginnings of a) PS/2 keyboard driver
 
 ## Credits
 
