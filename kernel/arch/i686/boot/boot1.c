@@ -51,8 +51,8 @@ void hlinit(struct multiboot_info *mbi_phys)
         switch (tag->type) {
         case MULTIBOOT_TAG_TYPE_BASIC_MEMINFO:
             mem_init_regions(
-                ((struct multiboot_tag_basic_meminfo *)tag)->mem_lower,
-                ((struct multiboot_tag_basic_meminfo *)tag)->mem_upper);
+                ((struct multiboot_tag_basic_meminfo *)tag)->mem_lower * 1024,
+                ((struct multiboot_tag_basic_meminfo *)tag)->mem_upper * 1024);
             break;
         
         case MULTIBOOT_TAG_TYPE_MMAP:
