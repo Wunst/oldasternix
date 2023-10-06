@@ -178,7 +178,7 @@ void *mem_map_range(uint32_t virt_min, uint32_t phys_start, uint32_t phys_end,
     size_t page_offset = phys_start & 4095;
     size_t n = (phys_end - phys_start + 4095) / PAGE_SIZE;
 
-    phys_start &= ~4096;
+    phys_start &= ~4095;
 
     return mem_map(virt_min, n, phys_start, flags) + page_offset;
 }
