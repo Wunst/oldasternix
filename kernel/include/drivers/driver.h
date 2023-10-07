@@ -4,7 +4,6 @@
 #include <stddef.h>
 
 #include "types.h"
-#include "fs.h"
 
 struct char_driver {
     int (*read)(dev_t, off_t, char *, size_t);

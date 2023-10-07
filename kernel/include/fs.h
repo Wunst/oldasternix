@@ -17,8 +17,6 @@ typedef uint16_t mode_t;
 
 typedef uint32_t ino_t;
 
-typedef uint32_t blkcnt_t;
-
 enum i_perms {
     I_XUSR = 0001,
     I_WUSR = 0002,
