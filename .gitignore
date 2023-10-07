@@ -11,3 +11,7 @@ asternix.iso
 kernel/asternix.bin
 libc/libc.so
 libc/libk.a
+
+# Doxygen output
+html/
+latex/
