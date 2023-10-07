@@ -5,8 +5,9 @@
 
 #include <drivers/driver.h>
 #include <drivers/major.h>
-#include <fs/fs_types.h>
 #include <initcall.h>
+
+#include "types.h"
 
 enum memdev_type {
     MEMDEV_NULL = 1,

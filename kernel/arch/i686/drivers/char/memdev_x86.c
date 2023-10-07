@@ -9,8 +9,9 @@
 
 #include <errno.h>
 
-#include <fs/fs_types.h>
 #include <x86/pio.h>
+
+#include "types.h"
 
 int port_read(off_t pos, char *buf, size_t n)
 {

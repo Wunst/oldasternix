@@ -6,10 +6,8 @@
 #include <string.h>
 
 #include <drivers/driver.h>
-#include <fs/fs_dentry.h>
-#include <fs/fs_driver.h>
-#include <fs/fs_inode.h>
-#include <fs/fs_types.h>
+
+#include "fs.h"
 
 #define TMPFS_BLK_SIZE 4096
 

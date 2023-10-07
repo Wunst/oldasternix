@@ -10,11 +10,10 @@
 #include <drivers/major.h>
 #include <drivers/tty.h>
 #include <drivers/block/ramdisk.h>
-#include <fs/fs_dentry.h>
-#include <fs/fs_driver.h>
-#include <fs/fs_inode.h>
 #include <x86/interrupts.h>
 #include <x86/mem.h>
+
+#include "fs.h"
 
 struct multiboot_info {
     uint32_t total_size;

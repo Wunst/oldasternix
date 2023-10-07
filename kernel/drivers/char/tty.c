@@ -12,7 +12,8 @@
 #include <drivers/driver.h>
 #include <drivers/major.h>
 #include <drivers/tty.h>
-#include <fs/fs_types.h>
+
+#include "types.h"
 
 /*
  * Minor device numbers:

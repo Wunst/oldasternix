@@ -7,8 +7,9 @@
 
 #include <drivers/driver.h>
 #include <drivers/major.h>
-#include <fs/fs_types.h>
 #include <initcall.h>
+
+#include "types.h"
 
 #define MAX_RAMDISK 8
 
