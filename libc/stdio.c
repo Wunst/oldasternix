@@ -47,6 +47,15 @@ int printf(const char *format, ...)
     va_list args;
     va_start(args, format);
 
+    int ret = vprintf(format, args);
+
+    va_end(args);
+
+    return ret;
+}
+
+int vprintf(const char *format, va_list args)
+{
     /* Potential format args */
     const char *s;
     char c;
@@ -97,22 +106,23 @@ int printf(const char *format, ...)
                 n += putiradix(d, 10, 0, num_min, num_filler);
                 break;
             case 'u':
-                d = va_arg(args, int);
+                d = va_arg(args, unsigned);
                 n += putiradix(d, 10, 0, num_min, num_filler);
                 break;
             case 'p':
                 n += puts("0x");
                 /* fallthrough */
             case 'x':
-                d = va_arg(args, int);
+                printf("");
+                d = va_arg(args, unsigned);
                 n += putiradix(d, 16, 'a', num_min, num_filler);
                 break;
             case 'X':
-                d = va_arg(args, int);
+                d = va_arg(args, unsigned);
                 n += putiradix(d, 16, 'A', num_min, num_filler);
                 break;
             case 'o':
-                d = va_arg(args, int);
+                d = va_arg(args, unsigned);
                 n += putiradix(d, 8, 0, num_min, num_filler);
                 break;
             case 'n':

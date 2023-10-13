@@ -9,6 +9,8 @@
 #ifndef __STDIO_H
 #define __STDIO_H
 
+#include <stdarg.h>
+
 #ifdef __is_kernel
 
 /**
@@ -67,6 +69,13 @@ int puts(const char *s);
  * for all format specifiers defined by the standard
  */
 int printf(const char *format, ...);
+
+/**
+ * @brief Print format from va_list
+ * 
+ * Like `printf()`, but accepts a `va_list` directly instead of varargs.
+*/
+int vprintf(const char *format, va_list args);
 
 #endif
 
