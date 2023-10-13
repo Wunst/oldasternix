@@ -7,6 +7,8 @@
 
 #include <x86/pio.h>
 
+#include "panic.h"
+
 #define MS_CMD 0x20
 #define MS_DATA 0x21
 #define SL_CMD 0xa0
@@ -19,6 +21,7 @@
 
 /* defined in interrupts.s */
 extern void load_enable_interrupts(void);
+extern isr_stub *exc_isrs[32];
 
 struct idt_entry {
     uint16_t offset_low;
@@ -75,7 +78,7 @@ static void init_table()
     base_entry.offset_low = 0;
     base_entry.segment = 0x08; /* kernel code */
     base_entry._res32 = 0;
-    base_entry.type = 0xe; /* 32-bit exception */
+    base_entry.type = INTERRUPT;
     base_entry._res44 = 0;
     base_entry.ring = 0;
     base_entry.present = 0;
@@ -94,6 +97,10 @@ void setup_interrupts()
 {
     init_pic();
     init_table();
+
+    for (int i = 0; i < 32; i++)
+        set_isr_type(i, exc_isrs[i], TRAP);
+
     load_enable_interrupts();
 }
 
@@ -103,6 +110,13 @@ void set_isr(uint8_t int_no, isr_stub *stub)
     IDT[int_no].offset_high = (uint16_t)((uint32_t)stub >> 16);
 
     IDT[int_no].present = stub ? 1 : 0;
+}
+
+void set_isr_type(uint8_t int_no, isr_stub *stub, enum isr_type type)
+{
+    IDT[int_no].type = type;
+
+    set_isr(int_no, stub);
 }
 
 void pic_set_mask(uint8_t irq)
@@ -147,4 +161,68 @@ void pic_eoi(uint8_t irq)
         outb(SL_CMD, PIC_EOI);
     
     outb(MS_CMD, PIC_EOI);
+}
+
+static const char *exceptions[32] = {
+    "Division Error (#DE)",
+    "Debug (#DB)",
+    "<Non-Maskable Interrupt>",
+    "Breakpoint (#BP)",
+    "Overflow (#OF)",
+    "Bound Range Exceeded (#BR)",
+    "Invalid Opcode (#UD)",
+    "Device Not Available (#NM)",
+    "Double Fault (#DF)",
+    "Coprocessor Segment Overrun",
+    "Invalid TSS (#TS)",
+    "Segment Not Present (#NP)",
+    "Stack-Segment Fault (#SS)",
+    "General Protection Fault (#GP)",
+    "Page Fault (#PF)",
+    "<Reserved>",
+    "x87 Floating-Point Exception (#MF)",
+    "Alignment Check (#AC)",
+    "Machine Check (#MC)",
+    "SIMD Floating-Point Exception (#XM)",
+    "Virtualization Exception (#VE)",
+    "Control Protection Exception (#CP)",
+    "<Reserved>",
+    "<Reserved>",
+    "<Reserved>",
+    "<Reserved>",
+    "<Reserved>",
+    "<Reserved>",
+    "Hypervisor Injection Exception (#HV)",
+    "VMM Communication Exception (#VC)",
+    "Security Exception (#SX)",
+    "<Reserved>",
+};
+
+void exception_code(uint32_t error, struct error_registers regs)
+{
+    const char *name = exceptions[error];
+    panic("An exception occured: %s\n"
+        "Error code: %08x\n"
+        "Register dump:\n"
+        "%%eax = %08x\t%%ebx = %08x\n"
+        "%%ecx = %08x\t%%edx = %08x\n"
+        "%%ebp = %08x\t%%esp = %08x\n"
+        "%%esi = %08x\t%%edi = %08x\n"
+        "%%eflags = %08x\n",
+        name, regs.error_code, regs.eax, regs.ebx, regs.ecx, regs.edx,
+        regs.ebp, regs.esp, regs.esi, regs.edi, regs.eflags);
+}
+
+void exception_no_code(uint32_t error, struct registers regs)
+{
+    const char *name = exceptions[error];
+    panic("An exception occured: %s\n"
+        "Register dump:\n"
+        "%%eax = %08x\t%%ebx = %08x\n"
+        "%%ecx = %08x\t%%edx = %08x\n"
+        "%%ebp = %08x\t%%esp = %08x\n"
+        "%%esi = %08x\t%%edi = %08x\n"
+        "%%eflags = %08x\n",
+        name, regs.eax, regs.ebx, regs.ecx, regs.edx, regs.ebp, regs.esp,
+        regs.esi, regs.edi, regs.eflags);
 }
