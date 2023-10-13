@@ -35,6 +35,8 @@ void hlinit(struct multiboot_info *mbi_phys)
     mem_init();
     tty_init();
 
+    setup_interrupts();
+
     /*
      * Parse multiboot information structure.
      *
@@ -42,6 +44,9 @@ void hlinit(struct multiboot_info *mbi_phys)
      * TODO: Parse ACPI tables, reclaim ACPI memory, get framebuffer info
      */
     struct multiboot_tag *tag;
+
+    uint32_t rd_start = 0;
+    uint32_t rd_end = 0;
 
     for (tag = mbi_phys->tags;
         tag->type != MULTIBOOT_TAG_TYPE_END;
@@ -63,31 +68,34 @@ void hlinit(struct multiboot_info *mbi_phys)
                 mmap = (void *)mmap +
                     ((struct multiboot_tag_mmap *)tag)->entry_size) {
                 
-                if (mmap->type != MULTIBOOT_MEMORY_AVAILABLE)
+                if (mmap->type != MULTIBOOT_MEMORY_AVAILABLE) {
+                    printf("Reserved region: %8x\n", mmap->addr);
                     mem_set_used(mmap->addr, mmap->len);
+                }
             }
             break;
         
         case MULTIBOOT_TAG_TYPE_MODULE:
-            ;
-            /* Initial RAM disk is passed as a multiboot module. Map it
-             * immediately after the kernel binary. */
-            uint32_t start = ((struct multiboot_tag_module *)tag)->mod_start;
-            uint32_t end = ((struct multiboot_tag_module *)tag)->mod_end;
-
-            void *ramdisk = mem_map_range(K_MEM_START, start, end,
-                DEFAULT_PAGE_FLAGS);
-            
-            dev_t rd = add_ramdisk(PAGE_SIZE, ramdisk, end - start);
-            printf("info: added RAM disk as dev %d:%d\n", MAJOR(rd), MINOR(rd));
-
-            break;
+            /* Initial RAM disk is passed as a multiboot module. */
+            printf("Got module\n");
+            rd_start = ((struct multiboot_tag_module *)tag)->mod_start;
+            rd_end = ((struct multiboot_tag_module *)tag)->mod_end;
+            printf("start: %8x end: %8x\n", rd_start, rd_end);
         }   
+    }
+
+    /* Only map RAM disk after we've got the memory map. */
+    if (rd_start && rd_end) {
+        void *ramdisk = mem_map_range(K_MEM_START, rd_start, rd_end,
+                DEFAULT_PAGE_FLAGS);
+        
+        dev_t rd = add_ramdisk(PAGE_SIZE, ramdisk, rd_end - rd_start);
+        printf("info: added RAM disk as dev %d:%d\n", MAJOR(rd), MINOR(rd));
     }
 
     /* TODO: Kernel panic if no memory info */
 
-    setup_interrupts();
+    halt_loop();
 
     for (initcall_f *pp = &__initcall_start; pp < &__initcall_end; pp++)
         (**pp)();

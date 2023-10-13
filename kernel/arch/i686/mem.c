@@ -95,6 +95,8 @@ static uint32_t alloc_phys()
 
 void mem_init_regions(uint32_t lower, uint32_t upper)
 {
+    printf("lower: %8x upper: %8x\n", lower, upper);
+
     /* Mark memory between the end of lower memory and start of upper memory as
      * used (e.g. video memory). */
     for (uint32_t page = lower & ~4095; page < 0x100000; page += PAGE_SIZE)
