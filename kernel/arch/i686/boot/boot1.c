@@ -37,6 +37,8 @@ void hlinit(struct multiboot_info *mbi_phys)
     tty_init();
 
     bool got_rd = false;
+    bool got_meminfo = false;
+    bool got_mmap = false;
 
     uint32_t rd_start = 0;
     uint32_t rd_end = 0;
@@ -87,7 +89,16 @@ void hlinit(struct multiboot_info *mbi_phys)
         }   
     }
 
-    /* TODO: Kernel panic if no memory info */
+    if (!got_meminfo || !got_mmap)
+        panic(
+            "Did not get required memory maps from GRUB.\n"
+            "\tgot meminfo? %s\n"
+            "\tgot mmap? %s\n"
+            "Are you using legacy (BIOS) boot mode? Legacy BIOS is still"
+            "required to boot *nix at this point. Sorry for the"
+            "inconvenience! :(\n",
+            got_meminfo ? "yes" : "no",
+            got_mmap ? "yes" : "no");
 
     if (got_rd) {
         void *ramdisk = mem_map_range(
