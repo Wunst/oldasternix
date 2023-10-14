@@ -11,7 +11,7 @@ SECTIONS
 
     PROVIDE(__kernel_virtual_offset = 0xC0000000);
     . += __kernel_virtual_offset;
-
+    
     PROVIDE(__kernel_start = .);
 
     .text ALIGN(4K) : AT(ADDR(.text) - __kernel_virtual_offset)

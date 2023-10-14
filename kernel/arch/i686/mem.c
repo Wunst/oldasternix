@@ -127,8 +127,8 @@ void mem_set_used(uint64_t phys, uint64_t min_size)
 
 void mem_init()
 {
-    uint32_t phys;
-    for (phys = (uint32_t)&__kernel_start; phys < (uint32_t)&__kernel_end;
+    for (uint32_t phys = (uint32_t)&__kernel_start & ~4095;
+            phys < (uint32_t)&__kernel_end;
             phys += PAGE_SIZE) {
         set_phys_used(phys - (uint32_t)&__kernel_virtual_offset, 1);
     }
