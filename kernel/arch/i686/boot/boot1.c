@@ -14,6 +14,7 @@
 #include <x86/mem.h>
 
 #include "fs.h"
+#include "panic.h"
 
 struct multiboot_info {
     uint32_t total_size;
@@ -34,6 +35,11 @@ void hlinit(struct multiboot_info *mbi_phys)
 {
     mem_init();
     tty_init();
+
+    bool got_rd = false;
+
+    uint32_t rd_start = 0;
+    uint32_t rd_end = 0;
 
     /*
      * Parse multiboot information structure.
@@ -69,23 +75,27 @@ void hlinit(struct multiboot_info *mbi_phys)
             break;
         
         case MULTIBOOT_TAG_TYPE_MODULE:
-            ;
             /* Initial RAM disk is passed as a multiboot module. Map it
              * immediately after the kernel binary. */
-            uint32_t start = ((struct multiboot_tag_module *)tag)->mod_start;
-            uint32_t end = ((struct multiboot_tag_module *)tag)->mod_end;
+            rd_start = ((struct multiboot_tag_module *)tag)->mod_start;
+            rd_end = ((struct multiboot_tag_module *)tag)->mod_end;
 
-            void *ramdisk = mem_map_range(K_MEM_START, start, end,
-                DEFAULT_PAGE_FLAGS);
-            
-            dev_t rd = add_ramdisk(PAGE_SIZE, ramdisk, end - start);
-            printf("info: added RAM disk as dev %d:%d\n", MAJOR(rd), MINOR(rd));
+            /* Defer mapping. We should set up the memory maps first. */
+            got_rd = true;
 
             break;
         }   
     }
 
     /* TODO: Kernel panic if no memory info */
+
+    if (got_rd) {
+        void *ramdisk = mem_map_range(
+            K_MEM_START, rd_start, rd_end, DEFAULT_PAGE_FLAGS);
+        
+        dev_t rd = add_ramdisk(PAGE_SIZE, ramdisk, rd_end - rd_start);
+        printf("info: added RAM disk as dev %d:%d\n", MAJOR(rd), MINOR(rd));
+    }
 
     setup_interrupts();
 
