@@ -60,6 +60,7 @@ void hlinit(struct multiboot_info *mbi_phys)
             mem_init_regions(
                 ((struct multiboot_tag_basic_meminfo *)tag)->mem_lower * 1024,
                 ((struct multiboot_tag_basic_meminfo *)tag)->mem_upper * 1024);
+            got_meminfo = true;
             break;
         
         case MULTIBOOT_TAG_TYPE_MMAP:
@@ -74,6 +75,7 @@ void hlinit(struct multiboot_info *mbi_phys)
                 if (mmap->type != MULTIBOOT_MEMORY_AVAILABLE)
                     mem_set_used(mmap->addr, mmap->len);
             }
+            got_mmap = true;
             break;
         
         case MULTIBOOT_TAG_TYPE_MODULE:
