@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
     .section .text
     .global load_enable_interrupts
 

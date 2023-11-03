@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /*
  * file: kernel/arch/i686/drivers/char/memdev_x86.c
  *

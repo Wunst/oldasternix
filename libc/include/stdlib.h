@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef __STDLIB_H
 #define __STDLIB_H
 

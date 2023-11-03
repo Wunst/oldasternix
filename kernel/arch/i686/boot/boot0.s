@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
     .section .multiboot, "ax"
     .set magic, 0xe85250d6
     .set architecture, 0
